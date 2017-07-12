@@ -100,6 +100,11 @@ $_SESSION['project'] = $cl_project;
 $cl_task = $request->getParameter('task', ($request->getMethod()=='POST'? null : @$_SESSION['task']));
 $_SESSION['task'] = $cl_task;
 
+// helper function
+
+$smarty->assign('current_php_file', basename(__FILE__, '.php'));
+
+
 // Elements of timeRecordForm.
 $form = new Form('timeRecordForm');
 
@@ -196,8 +201,10 @@ if ((TYPE_START_FINISH == $user->record_type) || (TYPE_ALL == $user->record_type
 if ((TYPE_DURATION == $user->record_type) || (TYPE_ALL == $user->record_type))
   $form->addInput(array('type'=>'text','name'=>'duration','value'=>$cl_duration,'onchange'=>"formDisable('duration');"));
 if (!defined('NOTE_INPUT_HEIGHT'))
-	define('NOTE_INPUT_HEIGHT', 40);
-$form->addInput(array('type'=>'textarea','name'=>'note','style'=>'width: 600px; height:'.NOTE_INPUT_HEIGHT.'px;','value'=>$cl_note));
+	define('NOTE_INPUT_HEIGHT', '10em');
+if (!defined('NOTE_INPUT_WIDTH'))
+	define('NOTE_INPUT_WIDTH', '20em');
+$form->addInput(array('type'=>'textarea', 'name'=>'note','style'=>'width: '.NOTE_INPUT_WIDTH.'; max-width: '.NOTE_INPUT_WIDTH.'; height:'.NOTE_INPUT_HEIGHT.';','value'=>$cl_note));
 $form->addInput(array('type'=>'calendar','name'=>'date','value'=>$cl_date)); // calendar
 if ($user->isPluginEnabled('iv'))
   $form->addInput(array('type'=>'checkbox','name'=>'billable','value'=>$cl_billable));

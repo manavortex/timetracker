@@ -195,9 +195,9 @@ if ((TYPE_START_FINISH == $user->record_type) || (TYPE_ALL == $user->record_type
 }
 if ((TYPE_DURATION == $user->record_type) || (TYPE_ALL == $user->record_type))
   $form->addInput(array('type'=>'text','name'=>'duration','value'=>$cl_duration,'onchange'=>"formDisable('duration');"));
-if (!defined('NOTE_INPUT_HEIGHT'))
-	define('NOTE_INPUT_HEIGHT', 40);
-$form->addInput(array('type'=>'textarea','name'=>'note','style'=>'width: 600px; height:'.NOTE_INPUT_HEIGHT.'px;','value'=>$cl_note));
+if (!defined('input[type='submit']INPUT_HEIGHT'))
+	define('input[type='submit']INPUT_HEIGHT', 40);
+$form->addInput(array('type'=>'textarea','name'=>'note','style'=>'width: 600px; height:'.input[type='submit']INPUT_HEIGHT.'px;','value'=>$cl_note));
 $form->addInput(array('type'=>'calendar','name'=>'date','value'=>$cl_date)); // calendar
 if ($user->isPluginEnabled('iv'))
   $form->addInput(array('type'=>'checkbox','name'=>'billable','value'=>$cl_billable));

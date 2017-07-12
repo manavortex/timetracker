@@ -1,23 +1,33 @@
 <html>
 <head>
+  
   <meta http-equiv="content-type" content="text/html; charset={$smarty.const.CHARSET}">
   <link rel="icon" href="favicon.ico" type="image/x-icon">
   <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
   <link href="{$smarty.const.DEFAULT_CSS}" rel="stylesheet" type="text/css">
-{if $i18n.language.rtl}
-  <link href="{$smarty.const.RTL_CSS}" rel="stylesheet" type="text/css">
-{/if}
+
+  {if $i18n.language.rtl}
+    <link href="{$smarty.const.RTL_CSS}" rel="stylesheet" type="text/css">
+  {/if}
+
   <title>Time Tracker{if $title} - {$title}{/if}</title>
   <script src="js/strftime.js"></script>
-  <script>
+  <script>    
     {* Setup locale for strftime *}
     {$js_date_locale}
   </script>
+  <script src="http://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
   <script src="js/strptime.js"></script>
+  <script src="js/default.js"></script>
+
+  <link href="css/buttons.css" rel="stylesheet" type="text/css">  
+  <link href="css/{$current_template}.css" rel="stylesheet" type="text/css">
+  <script src="js/tpl/{$current_template}.js"></script>
+  
 </head>
 
 <body leftmargin="0" topmargin="0" marginheight="0" marginwidth="0" {$onload}>
-
+<script type="text/javascript">onLoadRunJavascript();</script>
 {assign var="tab_width" value="700"}
 
 <table height="100%" cellspacing="0" cellpadding="0" width="100%" border="0">

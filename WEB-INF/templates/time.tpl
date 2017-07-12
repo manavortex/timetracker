@@ -1,4 +1,7 @@
 {include file="time_script.tpl"}
+<script type="text/javascript">
+  setDurationInput("{$i18n.form.time.duration_format}");
+</script>
 
 <style>
 .not_billable td {
@@ -7,84 +10,95 @@
 </style>
 
 {$forms.timeRecordForm.open}
-<table cellspacing="4" cellpadding="0" border="0">
+<table id="timeRecordTable" cellspacing="4" cellpadding="0" border="0">
   <tr>
-    <td valign="top">
-      <table>
+    <td>
+      <table id="tableTimeRecordEntry">
 {if $on_behalf_control}
         <tr>
-          <td align="right">{$i18n.label.user}:</td>
-          <td>{$forms.timeRecordForm.onBehalfUser.control}</td>
+          <td id="tdUser" align="right">{$i18n.label.user}:</td>
+          <td id="tdUserForm" >{$forms.timeRecordForm.onBehalfUser.control}</td>
         </tr>
 {/if}
 {if $user->isPluginEnabled('cl')}
         <tr>
-          <td align="right">{$i18n.label.client}{if $user->isPluginEnabled('cm')} (*){/if}:</td>
-          <td>{$forms.timeRecordForm.client.control}</td>
+          <td id="tdClient" align="right">{$i18n.label.client}{if $user->isPluginEnabled('cm')} (*){/if}:</td>
+          <td id="tdClientForm" >{$forms.timeRecordForm.client.control}</td>
         </tr>
 {/if}
 {if $user->isPluginEnabled('iv')}
         <tr>
-          <td align="right">&nbsp;</td>
-          <td><label>{$forms.timeRecordForm.billable.control}{$i18n.form.time.billable}</label></td>
+          <td id="tdPlugin" align="right">&nbsp;</td>
+          <td id="tdPluginForm"><label>{$forms.timeRecordForm.billable.control}{$i18n.form.time.billable}</label></td>
         </tr>
 {/if}
 {if ($custom_fields && $custom_fields->fields[0])}
         <tr>
-          <td align="right">{$custom_fields->fields[0]['label']|escape}{if $custom_fields->fields[0]['required']} (*){/if}:</td><td>{$forms.timeRecordForm.cf_1.control}</td>
+          <td id="tdCustomFields" align="right">{$custom_fields->fields[0]['label']|escape}{if $custom_fields->fields[0]['required']} (*){/if}:</td><td>{$forms.timeRecordForm.cf_1.control}</td>
         </tr>
 {/if}
 {if ($smarty.const.MODE_PROJECTS == $user->tracking_mode || $smarty.const.MODE_PROJECTS_AND_TASKS == $user->tracking_mode)}
         <tr>
-          <td align="right">{$i18n.label.project} (*):</td>
-          <td>{$forms.timeRecordForm.project.control}</td>
+          <td id="tdProjects" align="right">{$i18n.label.project} (*):</td>
+          <td id="tdProjectsForm">{$forms.timeRecordForm.project.control}</td>
         </tr>
 {/if}
 {if ($smarty.const.MODE_PROJECTS_AND_TASKS == $user->tracking_mode)}
         <tr>
-          <td align="right">{$i18n.label.task}:</td>
-          <td>{$forms.timeRecordForm.task.control}</td>
+          <td id="tdTask" align="right">{$i18n.label.task}:</td>
+          <td id="tdTaskForm">{$forms.timeRecordForm.task.control}</td>
         </tr>
 {/if}
 {if (($smarty.const.TYPE_START_FINISH == $user->record_type) || ($smarty.const.TYPE_ALL == $user->record_type))}
         <tr>
-          <td align="right">{$i18n.label.start}:</td>
-          <td>{$forms.timeRecordForm.start.control}&nbsp;<input onclick="setNow('start');" type="button" tabindex="-1" value="{$i18n.button.now}"></td>
+          <td id="tdStart" align="right">{$i18n.label.start}:</td>
+          <td id="tdStartForm">{$forms.timeRecordForm.start.control}&nbsp;<input onclick="setNow('start');" type="button" tabindex="-1" value="{$i18n.button.now}"></td>
         </tr>
         <tr>
-          <td align="right">{$i18n.label.finish}:</td>
-          <td>{$forms.timeRecordForm.finish.control}&nbsp;<input onclick="setNow('finish');" type="button" tabindex="-1" value="{$i18n.button.now}"></td>
+          <td id="tdFinish" align="right">{$i18n.label.finish}:</td>
+          <td id="tdFinishForm">{$forms.timeRecordForm.finish.control}&nbsp;<input onclick="setNow('finish');" type="button" tabindex="-1" value="{$i18n.button.now}"></td>
         </tr>
 {/if}
 {if (($smarty.const.TYPE_DURATION == $user->record_type) || ($smarty.const.TYPE_ALL == $user->record_type))}
         <tr>
-          <td align="right">{$i18n.label.duration}:</td>
-          <td>{$forms.timeRecordForm.duration.control}&nbsp;{$i18n.form.time.duration_format}</td>
+          <td id="tdDuration" align="right">{$i18n.label.duration}:</td>
+          <td id="tdDurationForm">{$forms.timeRecordForm.duration.control}</td>
         </tr>
 {/if}
+        <tr>
+          <td id="tdNote" align="right">{$i18n.label.note}:</td>
+          <td id="tdNoteForm" align="left">{$forms.timeRecordForm.note.control}</td>
+        </tr>
+
       </table>
     </td>
-    <td valign="top">
-      <table>
-        <tr><td>{$forms.timeRecordForm.date.control}</td></tr>
-      </table>
+    <td>
+      <table id="tableDatePicker">
+        <tr><td id="tdDate">{$forms.timeRecordForm.date.control}</td></tr>
+        <tr>
+          <td id="tdSubmit" align="center" colspan="2">{$forms.timeRecordForm.btn_submit.control}</td>
+        </tr>
+      </table>      
     </td>
+  </tr>
+  </tr>
+  <td>
+    <table id="tableNote">
+      <tr>
+        
+      </tr>
+      
+    </table>
+  </td>
+  <td></td>
   </tr>
 </table>
 
-<table>
-  <tr>
-    <td align="right">{$i18n.label.note}:</td>
-    <td align="left">{$forms.timeRecordForm.note.control}</td>
-  </tr>
-  <tr>
-    <td align="center" colspan="2">{$forms.timeRecordForm.btn_submit.control}</td>
-  </tr>
-</table>
+
 
 <table width="720">
 <tr>
-  <td valign="top">
+  <td>
 {if $time_records}
       <table border="0" cellpadding="3" cellspacing="1" width="100%">
       <tr>
@@ -108,20 +122,20 @@
   {foreach $time_records as $record}
       <tr bgcolor="{cycle values="#f5f5f5,#ccccce"}" {if !$record.billable} class="not_billable" {/if}>
     {if $user->isPluginEnabled('cl')}
-        <td valign="top">{$record.client|escape}</td>
+        <td>{$record.client|escape}</td>
     {/if}
     {if ($smarty.const.MODE_PROJECTS == $user->tracking_mode || $smarty.const.MODE_PROJECTS_AND_TASKS == $user->tracking_mode)}
-        <td valign="top">{$record.project|escape}</td>
+        <td>{$record.project|escape}</td>
     {/if}
     {if ($smarty.const.MODE_PROJECTS_AND_TASKS == $user->tracking_mode)}
-        <td valign="top">{$record.task|escape}</td>
+        <td>{$record.task|escape}</td>
     {/if}
     {if (($smarty.const.TYPE_START_FINISH == $user->record_type) || ($smarty.const.TYPE_ALL == $user->record_type))}
-        <td nowrap align="right" valign="top">{if $record.start}{$record.start}{else}&nbsp;{/if}</td>
-        <td nowrap align="right" valign="top">{if $record.finish}{$record.finish}{else}&nbsp;{/if}</td>
+        <td nowrap align="right">{if $record.start}{$record.start}{else}&nbsp;{/if}</td>
+        <td nowrap align="right">{if $record.finish}{$record.finish}{else}&nbsp;{/if}</td>
     {/if}
-        <td align="right" valign="top">{if ($record.duration == '0:00' && $record.start <> '')}<font color="#ff0000">{$i18n.form.time.uncompleted}</font>{else}{$record.duration}{/if}</td>
-        <td valign="top">{if $record.comment}{$record.comment|escape}{else}&nbsp;{/if}</td>
+        <td align="right">{if ($record.duration == '0:00' && $record.start <> '')}<font color="#ff0000">{$i18n.form.time.uncompleted}</font>{else}{$record.duration}{/if}</td>
+        <td>{if $record.comment}{$record.comment|escape}{else}&nbsp;{/if}</td>
         <td valign="top" align="center">
     {if $record.invoice_id}
           &nbsp;

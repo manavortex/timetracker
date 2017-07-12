@@ -34,7 +34,7 @@ class Calendar extends FormElement {
   var $showHolidays = true;
   var $weekStartDay = 0;
   
-    var $mHeader = "padding: 5px; font-size: 8pt; color: #333333; background-color: #d9d9d9;";
+    var $mHeader = "padding: 5px; font-size: 8pt; color: #333333;";
     var $mDayCell = "padding: 5px; border: 1px solid silver; font-size: 8pt; color: #333333; background-color: #ffffff;";
     var $mDaySelected = "padding: 5px; border: 1px solid silver; font-size: 8pt; color: #666666; background-color: #a6ccf7;";
     var $mDayWeekend = "padding: 5px; border: 1px solid silver; font-size: 8pt; color: #666666; background-color: #f7f7f7;";
@@ -204,7 +204,7 @@ class Calendar extends FormElement {
         $str .= "</TR>\n";
       }
 
-      $str .= "<tr><td colspan=\"7\" align=\"center\"><a id=\"today_link\" href=\"?".$this->controlName."=".strftime(DB_DATEFORMAT)."\" tabindex=\"-1\">".$i18n->getKey('label.today')."</a></td></tr>\n";
+      $str .= "<tr><td id='tdLinkToday' colspan=\"7\" align=\"center\"><a class='btn' id=\"today_link\" href=\"?".$this->controlName."=".strftime(DB_DATEFORMAT)."\" tabindex=\"-1\">".$i18n->getKey('label.today')."</a></td></tr>\n";
       $str .= "</table>\n";
 
       $str .= "<input type=\"hidden\" name=\"$this->controlName\" value=\"$indate\">\n";

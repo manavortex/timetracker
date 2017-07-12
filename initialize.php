@@ -251,4 +251,7 @@ function init_js_date_locale()
       p: ['AM', 'PM']
     };";
   $smarty->assign('js_date_locale', $js);
+  $template = str_replace(".php", "", basename($_SERVER["SCRIPT_NAME"]));
+  $smarty->assign('current_template', $template);
+  
 }

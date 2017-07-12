@@ -187,3 +187,26 @@ div#LoginAboutText { width:400px; }
 .mobile-table-details td {
   padding: 3px;
 }
+
+input[type='submit'], .btn {
+  border-radius:1.5em;
+  color: black;
+  background-color: white;
+  border: 1px solid black;
+  padding: 0.2em 1em;
+  margin-top: 1em;
+}
+input[type='submit'] {
+  padding: 0.5em 1.5em;
+}
+.CalendarHeader {
+  background-color: #a6ccf7;
+}
+
+
+
+.formInput, textarea[name="note"] {
+  border-color: lightgrey;
+}
+
+#tableDatePicker td#tdSubmit { padding-top: 1em; }

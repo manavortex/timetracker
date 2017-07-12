@@ -1,0 +1,8 @@
+#timeRecordTable > tbody > tr > td {
+  vertical-align: top;
+}
+
+#timeRecordTable td > table td:first-child {
+  width: 7em;
+}
+

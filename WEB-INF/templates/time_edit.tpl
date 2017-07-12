@@ -48,10 +48,11 @@
     </tr>
 {/if}
 {if (($smarty.const.TYPE_DURATION == $user->record_type) || ($smarty.const.TYPE_ALL == $user->record_type))}
-    <tr>
+{*     <tr>
       <td align="right">{$i18n.label.duration}:</td>
-      <td>{$forms.timeRecordForm.duration.control}&nbsp;{$i18n.form.time.duration_format}</td>
+      <td>{$forms.timeRecordForm.duration.control}</td>
     </tr>
+*}
 {/if}
     <tr>
       <td align="right">{$i18n.label.date}:</td>

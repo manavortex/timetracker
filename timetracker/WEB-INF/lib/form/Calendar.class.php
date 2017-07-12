@@ -34,7 +34,7 @@ class Calendar extends FormElement {
   var $showHolidays = true;
   var $weekStartDay = 0;
   
-    var $mHeader = "padding: 5px; font-size: 8pt; color: #333333; background-color: #d9d9d9;";
+    var $mHeader = "padding: 5px; font-size: 8pt; color: #333333;";
     var $mDayCell = "padding: 5px; border: 1px solid silver; font-size: 8pt; color: #333333; background-color: #ffffff;";
     var $mDaySelected = "padding: 5px; border: 1px solid silver; font-size: 8pt; color: #666666; background-color: #a6ccf7;";
     var $mDayWeekend = "padding: 5px; border: 1px solid silver; font-size: 8pt; color: #666666; background-color: #f7f7f7;";
