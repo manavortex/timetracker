@@ -216,4 +216,12 @@ function get_time() {
   var date = new Date();
   return date.strftime("%H:%M");
 }
+
+
+
+$(document).ready(function() {
+  setDurationInput("{$i18n.form.time.duration_format}");
+});
+
+
 </script>

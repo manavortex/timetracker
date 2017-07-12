@@ -27,7 +27,6 @@
 </head>
 
 <body leftmargin="0" topmargin="0" marginheight="0" marginwidth="0" {$onload}>
-<script type="text/javascript">onLoadRunJavascript();</script>
 {assign var="tab_width" value="700"}
 
 <table height="100%" cellspacing="0" cellpadding="0" width="100%" border="0">
