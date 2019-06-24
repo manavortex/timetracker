@@ -30,188 +30,120 @@ import('ttClientHelper');
 import('DateAndTime');
 import('Period');
 import('ttTimeHelper');
+import('ttConfigHelper');
 
 require_once(dirname(__FILE__).'/../../plugins/CustomFields.class.php');
+
+// Definitions of types for timesheet dropdown.
+define('TIMESHEET_ALL', 0); // Include all records.
+define('TIMESHEET_NOT_ASSIGNED', 1); // Include records not assigned to timesheets.
+define('TIMESHEET_ASSIGNED', 2); // Include records assigned to timesheets.
+define('TIMESHEET_PENDING', 3); // Include records in submitted timesheets that are pending manager approval.
+define('TIMESHEET_APPROVED', 4); // Include records in approved timesheets.
+define('TIMESHEET_NOT_APPROVED', 5); // Include records in disapproved timesheets.
 
 // Class ttReportHelper is used for help with reports.
 class ttReportHelper {
 
   // getWhere prepares a WHERE clause for a report query.
-  static function getWhere($bean) {
+  static function getWhere($options) {
     global $user;
+
+    $group_id = $user->getGroup();
+    $org_id = $user->org_id;
+
+    // A shortcut for timesheets.
+    if ($options['timesheet_id']) {
+      $where = " where l.timesheet_id = ".$options['timesheet_id']." and l.group_id = $group_id and l.org_id = $org_id";
+      return $where;
+    }
 
     // Prepare dropdown parts.
     $dropdown_parts = '';
-    if ($bean->getAttribute('client'))
-      $dropdown_parts .= ' and l.client_id = '.$bean->getAttribute('client');
+    if ($options['client_id'])
+      $dropdown_parts .= ' and l.client_id = '.$options['client_id'];
     elseif ($user->isClient() && $user->client_id)
       $dropdown_parts .= ' and l.client_id = '.$user->client_id;
-    if ($bean->getAttribute('option')) $dropdown_parts .= ' and l.id in(select log_id from tt_custom_field_log where status = 1 and option_id = '.$bean->getAttribute('option').')';
-    if ($bean->getAttribute('project')) $dropdown_parts .= ' and l.project_id = '.$bean->getAttribute('project');
-    if ($bean->getAttribute('task')) $dropdown_parts .= ' and l.task_id = '.$bean->getAttribute('task');
-    if ($bean->getAttribute('include_records')=='1') $dropdown_parts .= ' and l.billable = 1';
-    if ($bean->getAttribute('include_records')=='2') $dropdown_parts .= ' and l.billable = 0';
-    if ($bean->getAttribute('invoice')=='1') $dropdown_parts .= ' and l.invoice_id is not NULL';
-    if ($bean->getAttribute('invoice')=='2') $dropdown_parts .= ' and l.invoice_id is NULL';
+    if ($options['cf_1_option_id']) $dropdown_parts .= ' and l.id in(select log_id from tt_custom_field_log where status = 1 and option_id = '.$options['cf_1_option_id'].')';
+    if ($options['project_id']) $dropdown_parts .= ' and l.project_id = '.$options['project_id'];
+    if ($options['task_id']) $dropdown_parts .= ' and l.task_id = '.$options['task_id'];
+    if ($options['billable']=='1') $dropdown_parts .= ' and l.billable = 1';
+    if ($options['billable']=='2') $dropdown_parts .= ' and l.billable = 0';
+    if ($options['invoice']=='1') $dropdown_parts .= ' and l.invoice_id is not null';
+    if ($options['invoice']=='2') $dropdown_parts .= ' and l.invoice_id is null';
+    if ($options['timesheet']==TIMESHEET_NOT_ASSIGNED) $dropdown_parts .= ' and l.timesheet_id is null';
+    if ($options['timesheet']==TIMESHEET_ASSIGNED) $dropdown_parts .= ' and l.timesheet_id is not null';
+    if ($options['approved']=='1') $dropdown_parts .= ' and l.approved = 1';
+    if ($options['approved']=='2') $dropdown_parts .= ' and l.approved = 0';
+    if ($options['paid_status']=='1') $dropdown_parts .= ' and l.paid = 1';
+    if ($options['paid_status']=='2') $dropdown_parts .= ' and l.paid = 0';
 
-    // Prepare user list part.
-    $userlist = -1;
-    if (($user->canManageTeam() || $user->isClient()) && is_array($bean->getAttribute('users')))
-      $userlist = join(',', $bean->getAttribute('users'));
     // Prepare sql query part for user list.
-    $user_list_part = null;
-    if ($user->canManageTeam() || $user->isClient())
+    $userlist = $options['users'] ? $options['users'] : '-1';
+    if ($user->can('view_reports') || $user->can('view_all_reports') || $user->isClient())
       $user_list_part = " and l.user_id in ($userlist)";
     else
-      $user_list_part = " and l.user_id = ".$user->id;
+      $user_list_part = " and l.user_id = ".$user->getUser();
+    $user_list_part .= " and l.group_id = $group_id and l.org_id = $org_id";
 
     // Prepare sql query part for where.
-    if ($bean->getAttribute('period'))
-      $period = new Period($bean->getAttribute('period'), new DateAndTime($user->date_format));
+    $dateFormat = $user->getDateFormat();
+    if ($options['period'])
+      $period = new Period($options['period'], new DateAndTime($dateFormat));
     else {
       $period = new Period();
       $period->setPeriod(
-        new DateAndTime($user->date_format, $bean->getAttribute('start_date')),
-        new DateAndTime($user->date_format, $bean->getAttribute('end_date')));
+        new DateAndTime($dateFormat, $options['period_start']),
+        new DateAndTime($dateFormat, $options['period_end']));
     }
-    $where = " where l.status = 1 and l.date >= '".$period->getBeginDate(DB_DATEFORMAT)."' and l.date <= '".$period->getEndDate(DB_DATEFORMAT)."'".
-      " $user_list_part $dropdown_parts";
-    return $where;
-  }
-
-  // getFavWhere prepares a WHERE clause for a favorite report query.
-  static function getFavWhere($report) {
-    global $user;
-
-    // Prepare dropdown parts.
-    $dropdown_parts = '';
-    if ($report['client_id'])
-      $dropdown_parts .= ' and l.client_id = '.$report['client_id'];
-    elseif ($user->isClient() && $user->client_id)
-      $dropdown_parts .= ' and l.client_id = '.$user->client_id;
-    if ($report['cf_1_option_id']) $dropdown_parts .= ' and l.id in(select log_id from tt_custom_field_log where status = 1 and option_id = '.$report['cf_1_option_id'].')';
-    if ($report['project_id']) $dropdown_parts .= ' and l.project_id = '.$report['project_id'];
-    if ($report['task_id']) $dropdown_parts .= ' and l.task_id = '.$report['task_id'];
-    if ($report['billable']=='1') $dropdown_parts .= ' and l.billable = 1';
-    if ($report['billable']=='2') $dropdown_parts .= ' and l.billable = 0';
-    if ($report['invoice']=='1') $dropdown_parts .= ' and l.invoice_id is not NULL';
-    if ($report['invoice']=='2') $dropdown_parts .= ' and l.invoice_id is NULL';
-
-    // Prepare user list part.
-    $userlist = -1;
-    if (($user->canManageTeam() || $user->isClient())) {
-      if ($report['users'])
-        $userlist = $report['users'];
-      else {
-        $active_users = ttTeamHelper::getActiveUsers();
-        foreach ($active_users as $single_user)
-          $users[] = $single_user['id'];
-        $userlist = join(',', $users);
-      }
-    }
-    // Prepare sql query part for user list.
-    $user_list_part = null;
-    if ($user->canManageTeam() || $user->isClient())
-      $user_list_part = " and l.user_id in ($userlist)";
-    else
-      $user_list_part = " and l.user_id = ".$user->id;
-
-    // Prepare sql query part for where.
-    if ($report['period'])
-      $period = new Period($report['period'], new DateAndTime($user->date_format));
-    else {
-      $period = new Period();
-      $period->setPeriod(
-        new DateAndTime($user->date_format, $report['period_start']),
-        new DateAndTime($user->date_format, $report['period_end']));
-    }
-    $where = " where l.status = 1 and l.date >= '".$period->getBeginDate(DB_DATEFORMAT)."' and l.date <= '".$period->getEndDate(DB_DATEFORMAT)."'".
+    $where = " where l.status = 1 and l.date >= '".$period->getStartDate(DB_DATEFORMAT)."' and l.date <= '".$period->getEndDate(DB_DATEFORMAT)."'".
       " $user_list_part $dropdown_parts";
     return $where;
   }
 
   // getExpenseWhere prepares WHERE clause for expenses query in a report.
-  static function getExpenseWhere($bean) {
+  static function getExpenseWhere($options) {
     global $user;
+
+    $group_id = $user->getGroup();
+    $org_id = $user->org_id;
 
     // Prepare dropdown parts.
     $dropdown_parts = '';
-    if ($bean->getAttribute('client'))
-      $dropdown_parts .= ' and ei.client_id = '.$bean->getAttribute('client');
+    if ($options['client_id'])
+      $dropdown_parts .= ' and ei.client_id = '.$options['client_id'];
     elseif ($user->isClient() && $user->client_id)
       $dropdown_parts .= ' and ei.client_id = '.$user->client_id;
-    if ($bean->getAttribute('project')) $dropdown_parts .= ' and ei.project_id = '.$bean->getAttribute('project');
-    if ($bean->getAttribute('invoice')=='1') $dropdown_parts .= ' and ei.invoice_id is not NULL';
-    if ($bean->getAttribute('invoice')=='2') $dropdown_parts .= ' and ei.invoice_id is NULL';
+    if ($options['project_id']) $dropdown_parts .= ' and ei.project_id = '.$options['project_id'];
+    if ($options['invoice']=='1') $dropdown_parts .= ' and ei.invoice_id is not null';
+    if ($options['invoice']=='2') $dropdown_parts .= ' and ei.invoice_id is null';
+    if (isset($options['timesheet']) && ($options['timesheet']!=TIMESHEET_ALL && $options['timesheet']!=TIMESHEET_NOT_ASSIGNED)) {
+        $dropdown_parts .= ' and 0 = 1'; // Expense items do not have a timesheet_id.
+    }
+    if ($options['approved']=='1') $dropdown_parts .= ' and ei.approved = 1';
+    if ($options['approved']=='2') $dropdown_parts .= ' and ei.approved = 0';
+    if ($options['paid_status']=='1') $dropdown_parts .= ' and ei.paid = 1';
+    if ($options['paid_status']=='2') $dropdown_parts .= ' and ei.paid = 0';
 
-    // Prepare user list part.
-    $userlist = -1;
-    if (($user->canManageTeam() || $user->isClient()) && is_array($bean->getAttribute('users')))
-      $userlist = join(',', $bean->getAttribute('users'));
     // Prepare sql query part for user list.
-    $user_list_part = null;
-    if ($user->canManageTeam() || $user->isClient())
+    $userlist = $options['users'] ? $options['users'] : '-1';
+    if ($user->can('view_reports') || $user->can('view_all_reports') || $user->isClient())
       $user_list_part = " and ei.user_id in ($userlist)";
     else
-      $user_list_part = " and ei.user_id = ".$user->id;
+      $user_list_part = " and ei.user_id = ".$user->getUser();
+    $user_list_part .= " and ei.group_id = $group_id and ei.org_id = $org_id";
 
     // Prepare sql query part for where.
-    if ($bean->getAttribute('period'))
-      $period = new Period($bean->getAttribute('period'), new DateAndTime($user->date_format));
+    $dateFormat = $user->getDateFormat();
+    if ($options['period'])
+      $period = new Period($options['period'], new DateAndTime($dateFormat));
     else {
       $period = new Period();
       $period->setPeriod(
-        new DateAndTime($user->date_format, $bean->getAttribute('start_date')),
-        new DateAndTime($user->date_format, $bean->getAttribute('end_date')));
+        new DateAndTime($dateFormat, $options['period_start']),
+        new DateAndTime($dateFormat, $options['period_end']));
     }
-    $where = " where ei.status = 1 and ei.date >= '".$period->getBeginDate(DB_DATEFORMAT)."' and ei.date <= '".$period->getEndDate(DB_DATEFORMAT)."'".
-      " $user_list_part $dropdown_parts";
-    return $where;
-  }
-
-  // getFavExpenseWhere prepares a WHERE clause for expenses query in a favorite report.
-  static function getFavExpenseWhere($report) {
-    global $user;
-
-    // Prepare dropdown parts.
-    $dropdown_parts = '';
-    if ($report['client_id'])
-      $dropdown_parts .= ' and ei.client_id = '.$report['client_id'];
-    elseif ($user->isClient() && $user->client_id)
-      $dropdown_parts .= ' and ei.client_id = '.$user->client_id;
-    if ($report['project_id']) $dropdown_parts .= ' and ei.project_id = '.$report['project_id'];
-    if ($report['invoice']=='1') $dropdown_parts .= ' and ei.invoice_id is not NULL';
-    if ($report['invoice']=='2') $dropdown_parts .= ' and ei.invoice_id is NULL';
-
-    // Prepare user list part.
-    $userlist = -1;
-    if (($user->canManageTeam() || $user->isClient())) {
-      if ($report['users'])
-        $userlist = $report['users'];
-      else {
-      	$active_users = ttTeamHelper::getActiveUsers();
-        foreach ($active_users as $single_user)
-          $users[] = $single_user['id'];
-        $userlist = join(',', $users);
-      }
-    }
-    // Prepare sql query part for user list.
-    $user_list_part = null;
-    if ($user->canManageTeam() || $user->isClient())
-      $user_list_part = " and ei.user_id in ($userlist)";
-    else
-      $user_list_part = " and ei.user_id = ".$user->id;
-
-    // Prepare sql query part for where.
-    if ($report['period'])
-      $period = new Period($report['period'], new DateAndTime($user->date_format));
-    else {
-      $period = new Period();
-      $period->setPeriod(
-        new DateAndTime($user->date_format, $report['period_start']),
-        new DateAndTime($user->date_format, $report['period_end']));
-    }
-    $where = " where ei.status = 1 and ei.date >= '".$period->getBeginDate(DB_DATEFORMAT)."' and ei.date <= '".$period->getEndDate(DB_DATEFORMAT)."'".
+    $where = " where ei.status = 1 and ei.date >= '".$period->getStartDate(DB_DATEFORMAT)."' and ei.date <= '".$period->getEndDate(DB_DATEFORMAT)."'".
       " $user_list_part $dropdown_parts";
     return $where;
   }
@@ -219,33 +151,51 @@ class ttReportHelper {
   // getItems retrieves all items associated with a report.
   // It combines tt_log and tt_expense_items in one array for presentation in one table using mysql union all.
   // Expense items use the "note" field for item name.
-  static function getItems($bean) {
+  static function getItems($options) {
     global $user;
     $mdb2 = getConnection();
 
-    $group_by_option = $bean->getAttribute('group_by');
-    $convertTo12Hour = ('%I:%M %p' == $user->time_format) && ($bean->getAttribute('chstart') || $bean->getAttribute('chfinish'));
+    $group_id = $user->getGroup();
+    $org_id = $user->org_id;
+
+    // Determine these once as they are used in multiple places in this function.
+    $canViewReports = $user->can('view_reports') || $user->can('view_all_reports');
+    $isClient = $user->isClient();
+
+    $grouping = ttReportHelper::grouping($options);
+    if ($grouping) {
+      $grouping_by_date = ttReportHelper::groupingBy('date', $options);
+      $grouping_by_client = ttReportHelper::groupingBy('client', $options);
+      $grouping_by_project = ttReportHelper::groupingBy('project', $options);
+      $grouping_by_task = ttReportHelper::groupingBy('task', $options);
+      $grouping_by_user = ttReportHelper::groupingBy('user', $options);
+      $grouping_by_cf_1 = ttReportHelper::groupingBy('cf_1', $options);
+    }
+    $convertTo12Hour = ('%I:%M %p' == $user->getTimeFormat()) && ($options['show_start'] || $options['show_end']);
+    $trackingMode = $user->getTrackingMode();
+    $decimalMark = $user->getDecimalMark();
 
     // Prepare a query for time items in tt_log table.
     $fields = array(); // An array of fields for database query.
-    array_push($fields, 'l.id as id');
+    array_push($fields, 'l.id');
+    array_push($fields, 'l.user_id');
     array_push($fields, '1 as type'); // Type 1 is for tt_log entries.
-    array_push($fields, 'l.date as date');
-    if($user->canManageTeam() || $user->isClient())
+    array_push($fields, 'l.date');
+    if($canViewReports || $isClient)
       array_push($fields, 'u.name as user');
     // Add client name if it is selected.
-    if ($bean->getAttribute('chclient') || 'client' == $group_by_option)
+    if ($options['show_client'] || $grouping_by_client)
       array_push($fields, 'c.name as client');
     // Add project name if it is selected.
-    if ($bean->getAttribute('chproject') || 'project' == $group_by_option)
+    if ($options['show_project'] || $grouping_by_project)
       array_push($fields, 'p.name as project');
     // Add task name if it is selected.
-    if ($bean->getAttribute('chtask') || 'task' == $group_by_option)
+    if ($options['show_task'] || $grouping_by_task)
       array_push($fields, 't.name as task');
     // Add custom field.
-    $include_cf_1 = $bean->getAttribute('chcf_1') || 'cf_1' == $group_by_option;
+    $include_cf_1 = $options['show_custom_field_1'] || $grouping_by_cf_1;
     if ($include_cf_1) {
-      $custom_fields = new CustomFields($user->team_id);
+      $custom_fields = new CustomFields();
       $cf_1_type = $custom_fields->fields[0]['type'];
       if ($cf_1_type == CustomFields::TYPE_TEXT) {
         array_push($fields, 'cfl.value as cf_1');
@@ -254,43 +204,72 @@ class ttReportHelper {
       }
     }
     // Add start time.
-    if ($bean->getAttribute('chstart')) {
+    if ($options['show_start']) {
       array_push($fields, "l.start as unformatted_start");
       array_push($fields, "TIME_FORMAT(l.start, '%k:%i') as start");
     }
     // Add finish time.
-    if ($bean->getAttribute('chfinish'))
+    if ($options['show_end'])
       array_push($fields, "TIME_FORMAT(sec_to_time(time_to_sec(l.start) + time_to_sec(l.duration)), '%k:%i') as finish");
     // Add duration.
-    if ($bean->getAttribute('chduration'))
+    if ($options['show_duration'])
       array_push($fields, "TIME_FORMAT(l.duration, '%k:%i') as duration");
+    // Add work units.
+    if ($options['show_work_units']) {
+      if ($user->getConfigOption('unit_totals_only'))
+        array_push($fields, "null as units");
+      else {
+        $firstUnitThreshold = $user->getConfigInt('1st_unit_threshold', 0);
+        $minutesInUnit = $user->getConfigInt('minutes_in_unit', 15);
+        array_push($fields, "if(l.billable = 0 or time_to_sec(l.duration)/60 < $firstUnitThreshold, 0, ceil(time_to_sec(l.duration)/60/$minutesInUnit)) as units");
+      }
+    }
     // Add note.
-    if ($bean->getAttribute('chnote'))
+    if ($options['show_note'])
       array_push($fields, 'l.comment as note');
     // Handle cost.
-    $includeCost = $bean->getAttribute('chcost');
+    $includeCost = $options['show_cost'];
     if ($includeCost) {
-      if (MODE_TIME == $user->tracking_mode)
+      if (MODE_TIME == $trackingMode)
         array_push($fields, "cast(l.billable * coalesce(u.rate, 0) * time_to_sec(l.duration)/3600 as decimal(10,2)) as cost");   // Use default user rate.
       else
         array_push($fields, "cast(l.billable * coalesce(upb.rate, 0) * time_to_sec(l.duration)/3600 as decimal(10,2)) as cost"); // Use project rate for user.
       array_push($fields, "null as expense"); 
     }
+    // Add approved.
+    if ($options['show_approved'])
+      array_push($fields, 'l.approved');
+    // Add paid status.
+    if ($canViewReports && $options['show_paid'])
+      array_push($fields, 'l.paid');
+    // Add IP address.
+    if ($canViewReports && $options['show_ip']) {
+      array_push($fields, 'l.created');
+      array_push($fields, 'l.created_ip');
+      array_push($fields, 'l.modified');
+      array_push($fields, 'l.modified_ip');
+    }
     // Add invoice name if it is selected.
-    if (($user->canManageTeam() || $user->isClient()) && $bean->getAttribute('chinvoice'))
+    if (($canViewReports || $isClient) && $options['show_invoice'])
       array_push($fields, 'i.name as invoice');
+    // Add timesheet name if it is selected.
+    if ($options['show_timesheet'])
+      array_push($fields, 'ts.name as timesheet_name');
+    // Add has_files.
+    if ($options['show_files'])
+      array_push($fields, 'if(Sub1.entity_id is null, 0, 1) as has_files');
 
     // Prepare sql query part for left joins.
     $left_joins = null;
-    if ($bean->getAttribute('chclient') || 'client' == $group_by_option)
+    if ($options['show_client'] || $grouping_by_client)
       $left_joins .= " left join tt_clients c on (c.id = l.client_id)";
-    if (($user->canManageTeam() || $user->isClient()) && $bean->getAttribute('chinvoice'))
+    if (($canViewReports || $isClient) && $options['show_invoice'])
       $left_joins .= " left join tt_invoices i on (i.id = l.invoice_id and i.status = 1)";
-    if ($user->canManageTeam() || $user->isClient() || $user->isPluginEnabled('ex'))
+    if ($canViewReports || $isClient || $user->isPluginEnabled('ex'))
        $left_joins .= " left join tt_users u on (u.id = l.user_id)";
-    if ($bean->getAttribute('chproject') || 'project' == $group_by_option)
+    if ($options['show_project'] || $grouping_by_project)
       $left_joins .= " left join tt_projects p on (p.id = l.project_id)";
-    if ($bean->getAttribute('chtask') || 'task' == $group_by_option)
+    if ($options['show_task'] || $grouping_by_task)
       $left_joins .= " left join tt_tasks t on (t.id = l.task_id)";
     if ($include_cf_1) {
       if ($cf_1_type == CustomFields::TYPE_TEXT)
@@ -300,64 +279,109 @@ class ttReportHelper {
           " left join tt_custom_field_options cfo on (cfl.option_id = cfo.id)";
       }
     }
-    if ($includeCost && MODE_TIME != $user->tracking_mode)
+    if ($includeCost && MODE_TIME != $trackingMode)
       $left_joins .= " left join tt_user_project_binds upb on (l.user_id = upb.user_id and l.project_id = upb.project_id)";
+    if ($options['show_files']) {
+      $left_joins .= " left join (select distinct entity_id from tt_files".
+        " where entity_type = 'time' and group_id = $group_id and org_id = $org_id and status = 1) Sub1".
+        " on (l.id = Sub1.entity_id)";
+    }
 
-    $where = ttReportHelper::getWhere($bean);
+    // Prepare sql query part for inner joins.
+    $inner_joins = null;
+    if ($user->isPluginEnabled('ts')) {
+      $timesheet_option = $options['timesheet'];
+      if ($timesheet_option == TIMESHEET_PENDING)
+        $inner_joins .= " inner join tt_timesheets ts on (l.timesheet_id = ts.id and ts.submit_status = 1 and ts.approve_status is null)";
+      else if ($timesheet_option == TIMESHEET_APPROVED)
+        $inner_joins .= " inner join tt_timesheets ts on (l.timesheet_id = ts.id and ts.approve_status = 1)";
+      else if ($timesheet_option == TIMESHEET_NOT_APPROVED)
+        $inner_joins .= " inner join tt_timesheets ts on (l.timesheet_id = ts.id and ts.approve_status = 0)";
+      else if ($options['show_timesheet'])
+        $inner_joins .= " left join tt_timesheets ts on (l.timesheet_id = ts.id)"; // Left join for timesheet nme.
+    }
+
+    $where = ttReportHelper::getWhere($options);
 
     // Construct sql query for tt_log items.
-    $sql = "select ".join(', ', $fields)." from tt_log l $left_joins $where";
-    // If we don't have expense items (such as when the Expenses plugin is desabled), the above is all sql we need,
+    $sql = "select ".join(', ', $fields)." from tt_log l $left_joins $inner_joins $where";
+    // If we don't have expense items (such as when the Expenses plugin is disabled), the above is all sql we need,
     // with an exception of sorting part, that is added in the end.
 
     // However, when we have expenses, we need to do a union with a separate query for expense items from tt_expense_items table.
-    if ($bean->getAttribute('chcost') && $user->isPluginEnabled('ex')) { // if ex(penses) plugin is enabled
+    if ($options['show_cost'] && $user->isPluginEnabled('ex')) { // if ex(penses) plugin is enabled
 
       $fields = array(); // An array of fields for database query.
       array_push($fields, 'ei.id');
+      array_push($fields, 'ei.user_id');
       array_push($fields, '2 as type'); // Type 2 is for tt_expense_items entries.
       array_push($fields, 'ei.date');
-      if($user->canManageTeam() || $user->isClient())
+      if($canViewReports || $isClient)
         array_push($fields, 'u.name as user');
       // Add client name if it is selected.
-      if ($bean->getAttribute('chclient') || 'client' == $group_by_option)
+      if ($options['show_client'] || $grouping_by_client)
         array_push($fields, 'c.name as client');
       // Add project name if it is selected.
-      if ($bean->getAttribute('chproject') || 'project' == $group_by_option)
+      if ($options['show_project'] || $grouping_by_project)
         array_push($fields, 'p.name as project');
-      if ($bean->getAttribute('chtask') || 'task' == $group_by_option)
+      if ($options['show_task'] || $grouping_by_task)
         array_push($fields, 'null'); // null for task name. We need to match column count for union.
-      if ($bean->getAttribute('chcf_1') || 'cf_1' == $group_by_option)
+      if ($options['show_custom_field_1'] || $grouping_by_cf_1)
         array_push($fields, 'null'); // null for cf_1.
-      if ($bean->getAttribute('chstart')) {
+      if ($options['show_start']) {
         array_push($fields, 'null'); // null for unformatted_start.
         array_push($fields, 'null'); // null for start.
       }
-      if ($bean->getAttribute('chfinish'))
+      if ($options['show_end'])
         array_push($fields, 'null'); // null for finish.
-      if ($bean->getAttribute('chduration'))
+      if ($options['show_duration'])
         array_push($fields, 'null'); // null for duration.
+      if ($options['show_work_units'])
+        array_push($fields, 'null as units'); // null for work units.
       // Use the note field to print item name.
-      if ($bean->getAttribute('chnote'))
+      if ($options['show_note'])
         array_push($fields, 'ei.name as note');
       array_push($fields, 'ei.cost as cost');
       array_push($fields, 'ei.cost as expense');
+      // Add approved.
+      if ($options['show_approved'])
+        array_push($fields, 'ei.approved');
+      // Add paid status.
+      if ($canViewReports && $options['show_paid'])
+        array_push($fields, 'ei.paid');
+      // Add IP address.
+      if ($canViewReports && $options['show_ip']) {
+        array_push($fields, 'ei.created');
+        array_push($fields, 'ei.created_ip');
+        array_push($fields, 'ei.modified');
+        array_push($fields, 'ei.modified_ip');
+      }
       // Add invoice name if it is selected.
-      if (($user->canManageTeam() || $user->isClient()) && $bean->getAttribute('chinvoice'))
+      if (($canViewReports || $isClient) && $options['show_invoice'])
         array_push($fields, 'i.name as invoice');
+      if ($options['show_timesheet'])
+        array_push($fields, 'null as timesheet_name');
+      // Add has_files.
+      if ($options['show_files'])
+        array_push($fields, 'if(Sub1.entity_id is null, 0, 1) as has_files');
 
       // Prepare sql query part for left joins.
       $left_joins = null;
-      if ($user->canManageTeam() || $user->isClient())
+      if ($canViewReports || $isClient)
         $left_joins .= " left join tt_users u on (u.id = ei.user_id)";
-      if ($bean->getAttribute('chclient') || 'client' == $group_by_option)
+      if ($options['show_client'] || $grouping_by_client)
         $left_joins .= " left join tt_clients c on (c.id = ei.client_id)";
-      if ($bean->getAttribute('chproject') || 'project' == $group_by_option)
+      if ($options['show_project'] || $grouping_by_project)
         $left_joins .= " left join tt_projects p on (p.id = ei.project_id)";
-      if (($user->canManageTeam() || $user->isClient()) && $bean->getAttribute('chinvoice'))
+      if (($canViewReports || $isClient) && $options['show_invoice'])
         $left_joins .= " left join tt_invoices i on (i.id = ei.invoice_id and i.status = 1)";
+      if ($options['show_files']) {
+        $left_joins .= " left join (select distinct entity_id from tt_files".
+          " where entity_type = 'expense' and group_id = $group_id and org_id = $org_id and status = 1) Sub1".
+          " on (ei.id = Sub1.entity_id)";
+      }
 
-      $where = ttReportHelper::getExpenseWhere($bean);
+      $where = ttReportHelper::getExpenseWhere($options);
 
       // Construct sql query for expense items.
       $sql_for_expense_items = "select ".join(', ', $fields)." from tt_expense_items ei $left_joins $where";
@@ -368,13 +392,18 @@ class ttReportHelper {
 
     // Determine sort part.
     $sort_part = ' order by ';
-    if ('no_grouping' == $group_by_option || 'date' == $group_by_option)
+    if ($grouping) {
+      $sort_part2 .= ($options['group_by1'] != null && $options['group_by1'] != 'no_grouping') ? ', '.$options['group_by1'] : '';
+      $sort_part2 .= ($options['group_by2'] != null && $options['group_by2'] != 'no_grouping') ? ', '.$options['group_by2'] : '';
+      $sort_part2 .= ($options['group_by3'] != null && $options['group_by3'] != 'no_grouping') ? ', '.$options['group_by3'] : '';
+      if (!$grouping_by_date) $sort_part2 .= ', date';
+      $sort_part .= ltrim($sort_part2, ', '); // Remove leading comma and space.
+    } else {
       $sort_part .= 'date';
-    else
-      $sort_part .= $group_by_option.', date';
-    if (($user->canManageTeam() || $user->isClient()) && is_array($bean->getAttribute('users')) && 'user' != $group_by_option)
+    }
+    if (($canViewReports || $isClient) && $options['users'] && !$grouping_by_user)
       $sort_part .= ', user, type';
-    if ($bean->getAttribute('chstart'))
+    if ($options['show_start'])
       $sort_part .= ', unformatted_start';
     $sort_part .= ', id';
 
@@ -393,530 +422,172 @@ class ttReportHelper {
           $val['finish'] = ttTimeHelper::to12HourFormat($val['finish']);
       }
       if (isset($val['cost'])) {
-        if ('.' != $user->decimal_mark)
-          $val['cost'] = str_replace('.', $user->decimal_mark, $val['cost']);
+        if ('.' != $decimalMark)
+          $val['cost'] = str_replace('.', $decimalMark, $val['cost']);
       }
       if (isset($val['expense'])) {
-        if ('.' != $user->decimal_mark)
-          $val['expense'] = str_replace('.', $user->decimal_mark, $val['expense']);
-      }
-      if ('no_grouping' != $group_by_option) {
-        $val['grouped_by'] = $val[$group_by_option];
-        if ('date' == $group_by_option) {
-          // This is needed to get the date in user date format.
-          $o_date = new DateAndTime(DB_DATEFORMAT, $val['grouped_by']);
-          $val['grouped_by'] = $o_date->toString($user->date_format);
-          unset($o_date);
-        }
+        if ('.' != $decimalMark)
+          $val['expense'] = str_replace('.', $decimalMark, $val['expense']);
       }
 
-      // This is needed to get the date in user date format.
-      $o_date = new DateAndTime(DB_DATEFORMAT, $val['date']);
-      $val['date'] = $o_date->toString($user->date_format);
-      unset($o_date);
+      if ($grouping) $val['grouped_by'] = ttReportHelper::makeGroupByKey($options, $val);
+      $val['date'] = ttDateToUserFormat($val['date']);
 
-      $row = $val;
-      $report_items[] = $row;
+      $report_items[] = $val;
     }
 
     return $report_items;
   }
 
-  // getFavItems retrieves all items associated with a favorite report.
-  // It combines tt_log and tt_expense_items in one array for presentation in one table using mysql union all.
-  // Expense items use the "note" field for item name.
-  static function getFavItems($report) {
-    global $user;
-    $mdb2 = getConnection();
+  // putInSession stores tt_log and tt_expense_items ids from a report in user session
+  // as 2 comma-separated lists.
+  static function putInSession($report_items) {
+    unset($_SESSION['report_item_ids']);
+    unset($_SESSION['report_item_expense_ids']);
 
-    $group_by_option = $report['group_by'];
-    $convertTo12Hour = ('%I:%M %p' == $user->time_format) && ($report['show_start'] || $report['show_end']);
-
-    // Prepare a query for time items in tt_log table.
-    $fields = array(); // An array of fields for database query.
-    array_push($fields, 'l.id as id');
-    array_push($fields, '1 as type'); // Type 1 is for tt_log entries.
-    array_push($fields, 'l.date as date');
-    if($user->canManageTeam() || $user->isClient())
-      array_push($fields, 'u.name as user');
-    // Add client name if it is selected.
-    if ($report['show_client'] || 'client' == $group_by_option)
-      array_push($fields, 'c.name as client');
-    // Add project name if it is selected.
-    if ($report['show_project'] || 'project' == $group_by_option)
-      array_push($fields, 'p.name as project');
-    // Add task name if it is selected.
-    if ($report['show_task'] || 'task' == $group_by_option)
-      array_push($fields, 't.name as task');
-    // Add custom field.
-    $include_cf_1 = $report['show_custom_field_1'] || 'cf_1' == $group_by_option;
-    if ($include_cf_1) {
-      $custom_fields = new CustomFields($user->team_id);
-      $cf_1_type = $custom_fields->fields[0]['type'];
-      if ($cf_1_type == CustomFields::TYPE_TEXT) {
-        array_push($fields, 'cfl.value as cf_1');
-      } elseif ($cf_1_type == CustomFields::TYPE_DROPDOWN) {
-        array_push($fields, 'cfo.value as cf_1');
-      }
+    // Iterate through records and build 2 comma-separated lists.
+    foreach($report_items as $item) {
+      if ($item['type'] == 1)
+        $report_item_ids .= ','.$item['id'];
+      else if ($item['type'] == 2)
+         $report_item_expense_ids .= ','.$item['id'];
     }
-    // Add start time.
-    if ($report['show_start']) {
-      array_push($fields, "l.start as unformatted_start");
-      array_push($fields, "TIME_FORMAT(l.start, '%k:%i') as start");
-    }
-    // Add finish time.
-    if ($report['show_end'])
-      array_push($fields, "TIME_FORMAT(sec_to_time(time_to_sec(l.start) + time_to_sec(l.duration)), '%k:%i') as finish");
-    // Add duration.
-    if ($report['show_duration'])
-      array_push($fields, "TIME_FORMAT(l.duration, '%k:%i') as duration");
-    // Add note.
-    if ($report['show_note'])
-      array_push($fields, 'l.comment as note');
-    // Handle cost.
-    $includeCost = $report['show_cost'];
-    if ($includeCost) {
-      if (MODE_TIME == $user->tracking_mode)
-        array_push($fields, "cast(l.billable * coalesce(u.rate, 0) * time_to_sec(l.duration)/3600 as decimal(10,2)) as cost");   // Use default user rate.
-      else
-        array_push($fields, "cast(l.billable * coalesce(upb.rate, 0) * time_to_sec(l.duration)/3600 as decimal(10,2)) as cost"); // Use project rate for user.
-      array_push($fields, "null as expense"); 
-    }
-    // Add invoice name if it is selected.
-    if (($user->canManageTeam() || $user->isClient()) && $report['show_invoice'])
-      array_push($fields, 'i.name as invoice');
+    $report_item_ids = trim($report_item_ids, ',');
+    $report_item_expense_ids = trim($report_item_expense_ids, ',');
 
-    // Prepare sql query part for left joins.
-    $left_joins = null;
-    if ($report['show_client'] || 'client' == $group_by_option)
-      $left_joins .= " left join tt_clients c on (c.id = l.client_id)";
-    if (($user->canManageTeam() || $user->isClient()) && $report['show_invoice'])
-      $left_joins .= " left join tt_invoices i on (i.id = l.invoice_id and i.status = 1)";
-    if ($user->canManageTeam() || $user->isClient() || $user->isPluginEnabled('ex'))
-       $left_joins .= " left join tt_users u on (u.id = l.user_id)";
-    if ($report['show_project'] || 'project' == $group_by_option)
-      $left_joins .= " left join tt_projects p on (p.id = l.project_id)";
-    if ($report['show_task'] || 'task' == $group_by_option)
-      $left_joins .= " left join tt_tasks t on (t.id = l.task_id)";
-    if ($include_cf_1) {
-      if ($cf_1_type == CustomFields::TYPE_TEXT)
-        $left_joins .= " left join tt_custom_field_log cfl on (l.id = cfl.log_id and cfl.status = 1)";
-      elseif ($cf_1_type == CustomFields::TYPE_DROPDOWN) {
-        $left_joins .=  " left join tt_custom_field_log cfl on (l.id = cfl.log_id and cfl.status = 1)".
-          " left join tt_custom_field_options cfo on (cfl.option_id = cfo.id)";
-      }
-    }
-    if ($includeCost && MODE_TIME != $user->tracking_mode)
-      $left_joins .= " left join tt_user_project_binds upb on (l.user_id = upb.user_id and l.project_id = upb.project_id)";
+    // The lists are reqdy. Put them in session.
+    if ($report_item_ids) $_SESSION['report_item_ids'] = $report_item_ids;
+    if ($report_item_expense_ids) $_SESSION['report_item_expense_ids'] = $report_item_expense_ids;
+  }
 
-    $where = ttReportHelper::getFavWhere($report);
-
-    // Construct sql query for tt_log items.
-    $sql = "select ".join(', ', $fields)." from tt_log l $left_joins $where";
-    // If we don't have expense items (such as when the Expenses plugin is desabled), the above is all sql we need,
-    // with an exception of sorting part, that is added in the end.
-
-    // However, when we have expenses, we need to do a union with a separate query for expense items from tt_expense_items table.
-    if ($report['show_cost'] && $user->isPluginEnabled('ex')) { // if ex(penses) plugin is enabled
-
-      $fields = array(); // An array of fields for database query.
-      array_push($fields, 'ei.id');
-      array_push($fields, '2 as type'); // Type 2 is for tt_expense_items entries.
-      array_push($fields, 'ei.date');
-      if($user->canManageTeam() || $user->isClient())
-        array_push($fields, 'u.name as user');
-      // Add client name if it is selected.
-      if ($report['show_client'] || 'client' == $group_by_option)
-        array_push($fields, 'c.name as client');
-      // Add project name if it is selected.
-      if ($report['show_project'] || 'project' == $group_by_option)
-        array_push($fields, 'p.name as project');
-      if ($report['show_task'] || 'task' == $group_by_option)
-        array_push($fields, 'null'); // null for task name. We need to match column count for union.
-      if ($report['show_custom_field_1'] || 'cf_1' == $group_by_option)
-        array_push($fields, 'null'); // null for cf_1.
-      if ($report['show_start']) {
-        array_push($fields, 'null'); // null for unformatted_start.
-        array_push($fields, 'null'); // null for start.
-      }
-      if ($report['show_end'])
-        array_push($fields, 'null'); // null for finish.
-      if ($report['show_duration'])
-        array_push($fields, 'null'); // null for duration.
-      // Use the note field to print item name.
-      if ($report['show_note'])
-        array_push($fields, 'ei.name as note');
-      array_push($fields, 'ei.cost as cost');
-      array_push($fields, 'ei.cost as expense');
-      // Add invoice name if it is selected.
-      if (($user->canManageTeam() || $user->isClient()) && $report['show_invoice'])
-        array_push($fields, 'i.name as invoice');
-
-      // Prepare sql query part for left joins.
-      $left_joins = null;
-      if ($user->canManageTeam() || $user->isClient())
-        $left_joins .= " left join tt_users u on (u.id = ei.user_id)";
-      if ($report['show_client'] || 'client' == $group_by_option)
-        $left_joins .= " left join tt_clients c on (c.id = ei.client_id)";
-      if ($report['show_project'] || 'project' == $group_by_option)
-        $left_joins .= " left join tt_projects p on (p.id = ei.project_id)";
-      if (($user->canManageTeam() || $user->isClient()) && $report['show_invoice'])
-        $left_joins .= " left join tt_invoices i on (i.id = ei.invoice_id and i.status = 1)";
-
-      $where = ttReportHelper::getFavExpenseWhere($report);
-
-      // Construct sql query for expense items.
-      $sql_for_expense_items = "select ".join(', ', $fields)." from tt_expense_items ei $left_joins $where";
-
-      // Construct a union.
-      $sql = "($sql) union all ($sql_for_expense_items)";
-    }
-
-    // Determine sort part.
-    $sort_part = ' order by ';
-    if ($group_by_option == null || 'no_grouping' == $group_by_option || 'date' == $group_by_option) // TODO: fix DB for NULL values in group_by field.
-      $sort_part .= 'date';
-    else
-      $sort_part .= $group_by_option.', date';
-    if (($user->canManageTeam() || $user->isClient()) /*&& is_array($bean->getAttribute('users'))*/ && 'user' != $group_by_option)
-      $sort_part .= ', user, type';
-    if ($report['show_start'])
-      $sort_part .= ', unformatted_start';
-    $sort_part .= ', id';
-
-    $sql .= $sort_part;
-    // By now we are ready with sql.
-
-    // Obtain items for report.
-    $res = $mdb2->query($sql);
-    if (is_a($res, 'PEAR_Error')) die($res->getMessage());
-
-    while ($val = $res->fetchRow()) {
-      if ($convertTo12Hour) {
-        if($val['start'] != '')
-          $val['start'] = ttTimeHelper::to12HourFormat($val['start']);
-        if($val['finish'] != '')
-          $val['finish'] = ttTimeHelper::to12HourFormat($val['finish']);
-      }
-      if (isset($val['cost'])) {
-        if ('.' != $user->decimal_mark)
-          $val['cost'] = str_replace('.', $user->decimal_mark, $val['cost']);
-      }
-      if (isset($val['expense'])) {
-        if ('.' != $user->decimal_mark)
-          $val['expense'] = str_replace('.', $user->decimal_mark, $val['expense']);
-      }
-      if ('no_grouping' != $group_by_option) {
-        $val['grouped_by'] = $val[$group_by_option];
-        if ('date' == $group_by_option) {
-          // This is needed to get the date in user date format.
-          $o_date = new DateAndTime(DB_DATEFORMAT, $val['grouped_by']);
-          $val['grouped_by'] = $o_date->toString($user->date_format);
-          unset($o_date);
-        }
-      }
-
-      // This is needed to get the date in user date format.
-      $o_date = new DateAndTime(DB_DATEFORMAT, $val['date']);
-      $val['date'] = $o_date->toString($user->date_format);
-      unset($o_date);
-
-      $row = $val;
-      $report_items[] = $row;
-    }
-
-    return $report_items;
+  // getFromSession obtains tt_log and tt_expense_items ids stored in user session.
+  static function getFromSession() {
+    $items = array();
+    $report_item_ids = $_SESSION['report_item_ids'];
+    if ($report_item_ids)
+      $items['report_item_ids'] = explode(',', $report_item_ids);
+    $report_item_expense_ids = $_SESSION['report_item_expense_ids'];
+    if ($report_item_expense_ids)
+      $items['report_item_expense_ids'] = explode(',', $report_item_expense_ids);
+    return $items;
   }
 
   // getSubtotals calculates report items subtotals when a report is grouped by.
   // Without expenses, it's a simple select with group by.
   // With expenses, it becomes a select with group by from a combined set of records obtained with "union all".
-  static function getSubtotals($bean) {
+  static function getSubtotals($options) {
     global $user;
-
-    $group_by_option = $bean->getAttribute('group_by');
-    if ('no_grouping' == $group_by_option) return null;
-
     $mdb2 = getConnection();
 
-    // Start with sql to obtain subtotals for time items. This simple sql will be used when we have no expenses.
+    $concat_part = ttReportHelper::makeConcatPart($options);
+    $work_unit_part = ttReportHelper::makeWorkUnitPart($options);
+    $join_part = ttReportHelper::makeJoinPart($options);
+    $cost_part = ttReportHelper::makeCostPart($options);
+    $where = ttReportHelper::getWhere($options);
+    $group_by_part = ttReportHelper::makeGroupByPart($options);
 
-    // Determine group by field and a required join.
-    switch ($group_by_option) {
-      case 'date':
-        $group_field = 'l.date';
-        $group_join = '';
-        break;
-      case 'user':
-        $group_field = 'u.name';
-        $group_join = 'left join tt_users u on (l.user_id = u.id) ';
-        break;
-      case 'client':
-        $group_field = 'c.name';
-        $group_join = 'left join tt_clients c on (l.client_id = c.id) ';
-        break;
-      case 'project':
-        $group_field = 'p.name';
-        $group_join = 'left join tt_projects p on (l.project_id = p.id) ';
-        break;
-      case 'task':
-        $group_field = 't.name';
-        $group_join = 'left join tt_tasks t on (l.task_id = t.id) ';
-        break;
-      case 'cf_1':
-        $group_field = 'cfo.value';
-        $custom_fields = new CustomFields($user->team_id);
-        if ($custom_fields->fields[0]['type'] == CustomFields::TYPE_TEXT)
-          $group_join = 'left join tt_custom_field_log cfl on (l.id = cfl.log_id and cfl.status = 1) left join tt_custom_field_options cfo on (cfl.value = cfo.id) ';
-        elseif ($custom_fields->fields[0]['type'] == CustomFields::TYPE_DROPDOWN)
-          $group_join = 'left join tt_custom_field_log cfl on (l.id = cfl.log_id and cfl.status = 1) left join tt_custom_field_options cfo on (cfl.option_id = cfo.id) ';
-        break;
-    }
-
-    $where = ttReportHelper::getWhere($bean);
-    if ($bean->getAttribute('chcost')) {
-      if (MODE_TIME == $user->tracking_mode) {
-        if ($group_by_option != 'user')
-          $left_join = 'left join tt_users u on (l.user_id = u.id)';
-        $sql = "select $group_field as group_field, sum(time_to_sec(l.duration)) as time, 
-          sum(cast(l.billable * coalesce(u.rate, 0) * time_to_sec(l.duration)/3600 as decimal(10, 2))) as cost,
-          null as expenses from tt_log l
-          $group_join $left_join $where group by $group_field";
-      } else {
-        // If we are including cost and tracking projects, our query (the same as above) needs to join the tt_user_project_binds table.
-        $sql = "select $group_field as group_field, sum(time_to_sec(l.duration)) as time, 
-          sum(cast(l.billable * coalesce(upb.rate, 0) * time_to_sec(l.duration)/3600 as decimal(10,2))) as cost,
-          null as expenses from tt_log l
-          $group_join
-          left join tt_user_project_binds upb on (l.user_id = upb.user_id and l.project_id = upb.project_id) $where group by $group_field";
-      }
-    } else {
-      $sql = "select $group_field as group_field, sum(time_to_sec(l.duration)) as time, null as expenses from tt_log l
-         $group_join $where group by $group_field";
-    }
+    $parts = "$concat_part, sum(time_to_sec(l.duration)) as time, null as expenses".$work_unit_part.$cost_part;
+    $sql = "select $parts from tt_log l $join_part $where $group_by_part";
     // By now we have sql for time items.
 
     // However, when we have expenses, we need to do a union with a separate query for expense items from tt_expense_items table.
-    if ($bean->getAttribute('chcost') && $user->isPluginEnabled('ex')) { // if ex(penses) plugin is enabled
+    if ($options['show_cost'] && $user->isPluginEnabled('ex')) { // if ex(penses) plugin is enabled
 
-      // Determine group by field and a required join.
-      $group_join = null;
-      $group_field = 'null';
-      switch ($group_by_option) {
-        case 'date':
-          $group_field = 'ei.date';
-          $group_join = '';
-          break;
-        case 'user':
-          $group_field = 'u.name';
-          $group_join = 'left join tt_users u on (ei.user_id = u.id) ';
-          break;
-        case 'client':
-          $group_field = 'c.name';
-          $group_join = 'left join tt_clients c on (ei.client_id = c.id) ';
-          break;
-        case 'project':
-          $group_field = 'p.name';
-          $group_join = 'left join tt_projects p on (ei.project_id = p.id) ';
-          break;
-      }
-
-      $where = ttReportHelper::getExpenseWhere($bean);
-      $sql_for_expenses = "select $group_field as group_field, null as time, sum(ei.cost) as cost, sum(ei.cost) as expenses from tt_expense_items ei 
-        $group_join $where";
-      // Add a "group by" clause if we are grouping.
-      if ('null' != $group_field) $sql_for_expenses .= " group by $group_field";
+      $concat_part = ttReportHelper::makeConcatExpensesPart($options);
+      $join_part = ttReportHelper::makeJoinExpensesPart($options);
+      $where = ttReportHelper::getExpenseWhere($options);
+      $group_by_expenses_part = ttReportHelper::makeGroupByExpensesPart($options);
+      $sql_for_expenses = "select $concat_part, null as time";
+      if ($options['show_work_units']) $sql_for_expenses .= ", null as units";
+      $sql_for_expenses .= ", sum(ei.cost) as cost, sum(ei.cost) as expenses from tt_expense_items ei $join_part $where $group_by_expenses_part";
 
       // Create a combined query.
-      $sql = "select group_field, sum(time) as time, sum(cost) as cost, sum(expenses) as expenses from (($sql) union all ($sql_for_expenses)) t group by group_field";
+      $fields = ttReportHelper::makeCombinedSelectPart($options);
+      $combined = "select $fields, sum(time) as time";
+      if ($options['show_work_units']) $combined .= ", sum(units) as units";
+      $combined .= ", sum(cost) as cost, sum(expenses) as expenses from (($sql) union all ($sql_for_expenses)) t group by $fields";
+      $sql = $combined;
     }
 
     // Execute query.
     $res = $mdb2->query($sql);
     if (is_a($res, 'PEAR_Error')) die($res->getMessage());
-
     while ($val = $res->fetchRow()) {
-      if ('date' == $group_by_option) {
-        // This is needed to get the date in user date format.
-        $o_date = new DateAndTime(DB_DATEFORMAT, $val['group_field']);
-        $val['group_field'] = $o_date->toString($user->date_format);
-        unset($o_date);
-      }
-      $time = $val['time'] ? sec_to_time_fmt_hm($val['time']) : null;
-      if ($bean->getAttribute('chcost')) {
-        if ('.' != $user->decimal_mark) {
-          $val['cost'] = str_replace('.', $user->decimal_mark, $val['cost']);
-          $val['expenses'] = str_replace('.', $user->decimal_mark, $val['expenses']);
+      $time = ttTimeHelper::minutesToDuration($val['time'] / 60);
+      $rowLabel = ttReportHelper::makeGroupByLabel($val['group_field'], $options);
+      if ($options['show_cost']) {
+        $decimalMark = $user->getDecimalMark();
+        if ('.' != $decimalMark) {
+          $val['cost'] = str_replace('.', $decimalMark, $val['cost']);
+          $val['expenses'] = str_replace('.', $decimalMark, $val['expenses']);
         }
-        $subtotals[$val['group_field']] = array('name'=>$val['group_field'],'time'=>$time,'cost'=>$val['cost'],'expenses'=>$val['expenses']);
+        $subtotals[$val['group_field']] = array('name'=>$rowLabel,'user'=>$val['user'],'project'=>$val['project'],'task'=>$val['task'],'client'=>$val['client'],'cf_1'=>$val['cf_1'],'time'=>$time,'units'=> $val['units'],'cost'=>$val['cost'],'expenses'=>$val['expenses']);
       } else
-        $subtotals[$val['group_field']] = array('name'=>$val['group_field'],'time'=>$time);
-    }
-
-    return $subtotals;
-  }
-
-  // getFavSubtotals calculates report items subtotals when a favorite report is grouped by.
-  // Without expenses, it's a simple select with group by.
-  // With expenses, it becomes a select with group by from a combined set of records obtained with "union all".
-  static function getFavSubtotals($report) {
-    global $user;
-
-    $group_by_option = $report['group_by'];
-    if ('no_grouping' == $group_by_option) return null;
-
-    $mdb2 = getConnection();
-
-    // Start with sql to obtain subtotals for time items. This simple sql will be used when we have no expenses.
-
-    // Determine group by field and a required join.
-    switch ($group_by_option) {
-      case 'date':
-        $group_field = 'l.date';
-        $group_join = '';
-        break;
-      case 'user':
-        $group_field = 'u.name';
-        $group_join = 'left join tt_users u on (l.user_id = u.id) ';
-        break;
-      case 'client':
-        $group_field = 'c.name';
-        $group_join = 'left join tt_clients c on (l.client_id = c.id) ';
-        break;
-      case 'project':
-        $group_field = 'p.name';
-        $group_join = 'left join tt_projects p on (l.project_id = p.id) ';
-        break;
-      case 'task':
-        $group_field = 't.name';
-        $group_join = 'left join tt_tasks t on (l.task_id = t.id) ';
-        break;
-      case 'cf_1':
-        $group_field = 'cfo.value';
-        $custom_fields = new CustomFields($user->team_id);
-        if ($custom_fields->fields[0]['type'] == CustomFields::TYPE_TEXT)
-          $group_join = 'left join tt_custom_field_log cfl on (l.id = cfl.log_id and cfl.status = 1) left join tt_custom_field_options cfo on (cfl.value = cfo.id) ';
-        elseif ($custom_fields->fields[0]['type'] == CustomFields::TYPE_DROPDOWN)
-          $group_join = 'left join tt_custom_field_log cfl on (l.id = cfl.log_id and cfl.status = 1) left join tt_custom_field_options cfo on (cfl.option_id = cfo.id) ';
-        break;
-    }
-
-    $where = ttReportHelper::getFavWhere($report);
-    if ($report['show_cost']) {
-      if (MODE_TIME == $user->tracking_mode) {
-        if ($group_by_option != 'user')
-          $left_join = 'left join tt_users u on (l.user_id = u.id)';
-        $sql = "select $group_field as group_field, sum(time_to_sec(l.duration)) as time, 
-          sum(cast(l.billable * coalesce(u.rate, 0) * time_to_sec(l.duration)/3600 as decimal(10, 2))) as cost,
-          null as expenses from tt_log l
-          $group_join $left_join $where group by $group_field";
-      } else {
-        // If we are including cost and tracking projects, our query (the same as above) needs to join the tt_user_project_binds table.
-        $sql = "select $group_field as group_field, sum(time_to_sec(l.duration)) as time, 
-          sum(cast(l.billable * coalesce(upb.rate, 0) * time_to_sec(l.duration)/3600 as decimal(10,2))) as cost,
-          null as expenses from tt_log l 
-          $group_join
-          left join tt_user_project_binds upb on (l.user_id = upb.user_id and l.project_id = upb.project_id) $where group by $group_field";
-      }
-    } else {
-      $sql = "select $group_field as group_field, sum(time_to_sec(l.duration)) as time, null as expenses from tt_log l 
-         $group_join $where group by $group_field";
-    }
-    // By now we have sql for time items.
-
-    // However, when we have expenses, we need to do a union with a separate query for expense items from tt_expense_items table.
-    if ($report['show_cost'] && $user->isPluginEnabled('ex')) { // if ex(penses) plugin is enabled
-
-      // Determine group by field and a required join.
-      $group_join = null;
-      $group_field = 'null';
-      switch ($group_by_option) {
-        case 'date':
-          $group_field = 'ei.date';
-          $group_join = '';
-          break;
-        case 'user':
-          $group_field = 'u.name';
-          $group_join = 'left join tt_users u on (ei.user_id = u.id) ';
-          break;
-        case 'client':
-          $group_field = 'c.name';
-          $group_join = 'left join tt_clients c on (ei.client_id = c.id) ';
-          break;
-        case 'project':
-          $group_field = 'p.name';
-          $group_join = 'left join tt_projects p on (ei.project_id = p.id) ';
-          break;
-      }
-
-      $where = ttReportHelper::getFavExpenseWhere($report);
-      $sql_for_expenses = "select $group_field as group_field, null as time, sum(ei.cost) as cost, sum(ei.cost) as expenses from tt_expense_items ei 
-        $group_join $where";
-      // Add a "group by" clause if we are grouping.
-      if ('null' != $group_field) $sql_for_expenses .= " group by $group_field";
-
-      // Create a combined query.
-      $sql = "select group_field, sum(time) as time, sum(cost) as cost, sum(expenses) as expenses from (($sql) union all ($sql_for_expenses)) t group by group_field";
-    }
-
-    // Execute query.
-    $res = $mdb2->query($sql);
-    if (is_a($res, 'PEAR_Error')) die($res->getMessage());
-
-    while ($val = $res->fetchRow()) {
-      if ('date' == $group_by_option) {
-        // This is needed to get the date in user date format.
-        $o_date = new DateAndTime(DB_DATEFORMAT, $val['group_field']);
-        $val['group_field'] = $o_date->toString($user->date_format);
-        unset($o_date);
-      }
-      $time = $val['time'] ? sec_to_time_fmt_hm($val['time']) : null;
-      if ($report['show_cost']) {
-        if ('.' != $user->decimal_mark) {
-          $val['cost'] = str_replace('.', $user->decimal_mark, $val['cost']);
-          $val['expenses'] = str_replace('.', $user->decimal_mark, $val['expenses']);
-        }
-        $subtotals[$val['group_field']] = array('name'=>$val['group_field'],'time'=>$time,'cost'=>$val['cost'],'expenses'=>$val['expenses']);
-      } else
-        $subtotals[$val['group_field']] = array('name'=>$val['group_field'],'time'=>$time);
+        $subtotals[$val['group_field']] = array('name'=>$rowLabel,'user'=>$val['user'],'project'=>$val['project'],'task'=>$val['task'],'client'=>$val['client'],'cf_1'=>$val['cf_1'],'time'=>$time, 'units'=> $val['units']);
     }
 
     return $subtotals;
   }
 
   // getTotals calculates total hours and cost for all report items.
-  static function getTotals($bean)
+  static function getTotals($options)
   {
     global $user;
-
     $mdb2 = getConnection();
 
-    $where = ttReportHelper::getWhere($bean);
+    $trackingMode = $user->getTrackingMode();
+    $decimalMark = $user->getDecimalMark();
+    $where = ttReportHelper::getWhere($options);
 
-    // Start with a query for time items.
-    if ($bean->getAttribute('chcost')) {
-      if (MODE_TIME == $user->tracking_mode) {
-        $sql = "select sum(time_to_sec(l.duration)) as time,
-          sum(cast(l.billable * coalesce(u.rate, 0) * time_to_sec(l.duration)/3600 as decimal(10,2))) as cost,
-          null as expenses 
-          from tt_log l
-          left join tt_users u on (l.user_id = u.id) $where";
+    // Prepare parts.
+    $time_part = "sum(time_to_sec(l.duration)) as time";
+    if ($options['show_work_units']) {
+      $unitTotalsOnly = $user->getConfigOption('unit_totals_only');
+      $firstUnitThreshold = $user->getConfigInt('1st_unit_threshold', 0);
+      $minutesInUnit = $user->getConfigInt('minutes_in_unit', 15);
+      $units_part = $unitTotalsOnly ? ", null as units" : ", sum(if(l.billable = 0 or time_to_sec(l.duration)/60 < $firstUnitThreshold, 0, ceil(time_to_sec(l.duration)/60/$minutesInUnit))) as units";
+    }
+    if ($options['show_cost']) {
+      if (MODE_TIME == $trackingMode)
+        $cost_part = ", sum(cast(l.billable * coalesce(u.rate, 0) * time_to_sec(l.duration)/3600 as decimal(10,2))) as cost, null as expenses";
+      else
+        $cost_part = ", sum(cast(l.billable * coalesce(upb.rate, 0) * time_to_sec(l.duration)/3600 as decimal(10,2))) as cost, null as expenses";
+    } else {
+      $cost_part = ", null as cost, null as expenses";
+    }
+    if ($options['show_cost']) {
+      if (MODE_TIME == $trackingMode) {
+        $left_joins = "left join tt_users u on (l.user_id = u.id)";
       } else {
-        $sql = "select sum(time_to_sec(l.duration)) as time,
-          sum(cast(l.billable * coalesce(upb.rate, 0) * time_to_sec(l.duration)/3600 as decimal(10,2))) as cost,
-          null as expenses
-          from tt_log l
-          left join tt_user_project_binds upb on (l.user_id = upb.user_id and l.project_id = upb.project_id) $where";
+        $left_joins = "left join tt_user_project_binds upb on (l.user_id = upb.user_id and l.project_id = upb.project_id)";
       }
-    } else
-      $sql = "select sum(time_to_sec(l.duration)) as time, null as cost, null as expenses from tt_log l $where";
+    }
+    // Prepare sql query part for inner joins.
+    $inner_joins = null;
+    if ($user->isPluginEnabled('ts') && $options['timesheet']) {
+      $timesheet_option = $options['timesheet'];
+      if ($timesheet_option == TIMESHEET_PENDING)
+        $inner_joins .= " inner join tt_timesheets ts on (l.timesheet_id = ts.id and ts.submit_status = 1 and ts.approve_status is null)";
+      else if ($timesheet_option == TIMESHEET_APPROVED)
+        $inner_joins .= " inner join tt_timesheets ts on (l.timesheet_id = ts.id and ts.approve_status = 1)";
+      else if ($timesheet_option == TIMESHEET_NOT_APPROVED)
+        $inner_joins .= " inner join tt_timesheets ts on (l.timesheet_id = ts.id and ts.approve_status = 0)";
+    }
+    // Prepare a query for time items.
+    $sql = "select $time_part $units_part $cost_part from tt_log l $left_joins $inner_joins $where";
 
     // If we have expenses, query becomes a bit more complex.
-    if ($bean->getAttribute('chcost') && $user->isPluginEnabled('ex')) {
-      $where = ttReportHelper::getExpenseWhere($bean);
-      $sql_for_expenses = "select null as time, sum(cost) as cost, sum(cost) as expenses from tt_expense_items ei $where";
+    if ($options['show_cost'] && $user->isPluginEnabled('ex')) {
+      $where = ttReportHelper::getExpenseWhere($options);
+      $sql_for_expenses = "select null as time";
+      if ($options['show_work_units']) $sql_for_expenses .= ", null as units";
+      $sql_for_expenses .= ", sum(cost) as cost, sum(cost) as expenses from tt_expense_items ei $where";
+
       // Create a combined query.
-      $sql = "select sum(time) as time, sum(cost) as cost, sum(expenses) as expenses from (($sql) union all ($sql_for_expenses)) t";
+      $combined = "select sum(time) as time";
+      if ($options['show_work_units']) $combined .= ", sum(units) as units";
+      $combined .= ", sum(cost) as cost, sum(expenses) as expenses from (($sql) union all ($sql_for_expenses)) t";
+      $sql = $combined;
     }
 
     // Execute query.
@@ -924,100 +595,32 @@ class ttReportHelper {
     if (is_a($res, 'PEAR_Error')) die($res->getMessage());
 
     $val = $res->fetchRow();
-    $total_time = $val['time'] ? sec_to_time_fmt_hm($val['time']) : null;
-    if ($bean->getAttribute('chcost')) {
+    $total_time = ttTimeHelper::minutesToDuration($val['time'] / 60);
+    if ($options['show_cost']) {
       $total_cost = $val['cost'];
       if (!$total_cost) $total_cost = '0.00';
-      if ('.' != $user->decimal_mark)
-        $total_cost = str_replace('.', $user->decimal_mark, $total_cost);
+      if ('.' != $decimalMark)
+        $total_cost = str_replace('.', $decimalMark, $total_cost);
       $total_expenses = $val['expenses'];
       if (!$total_expenses) $total_expenses = '0.00';
-      if ('.' != $user->decimal_mark)
-        $total_expenses = str_replace('.', $user->decimal_mark, $total_expenses);
+      if ('.' != $decimalMark)
+        $total_expenses = str_replace('.', $decimalMark, $total_expenses);
     }
 
-    if ($bean->getAttribute('period'))
-      $period = new Period($bean->getAttribute('period'), new DateAndTime($user->date_format));
+    $dateFormat = $user->getDateFormat();
+    if ($options['period'])
+      $period = new Period($options['period'], new DateAndTime($dateFormat));
     else {
       $period = new Period();
       $period->setPeriod(
-        new DateAndTime($user->date_format, $bean->getAttribute('start_date')),
-        new DateAndTime($user->date_format, $bean->getAttribute('end_date')));
+        new DateAndTime($dateFormat, $options['period_start']),
+        new DateAndTime($dateFormat, $options['period_end']));
     }
 
-    $totals['start_date'] = $period->getBeginDate();
+    $totals['start_date'] = $period->getStartDate();
     $totals['end_date'] = $period->getEndDate();
     $totals['time'] = $total_time;
-    $totals['cost'] = $total_cost;
-    $totals['expenses'] = $total_expenses;
-
-    return $totals;
-  }
-
-  // getFavTotals calculates total hours and cost for all favorite report items.
-  static function getFavTotals($report)
-  {
-    global $user;
-
-    $mdb2 = getConnection();
-
-    $where = ttReportHelper::getFavWhere($report);
-
-    // Start with a query for time items.
-    if ($report['show_cost']) {
-      if (MODE_TIME == $user->tracking_mode) {
-        $sql = "select sum(time_to_sec(l.duration)) as time,
-          sum(cast(l.billable * coalesce(u.rate, 0) * time_to_sec(l.duration)/3600 as decimal(10,2))) as cost,
-          null as expenses 
-          from tt_log l
-          left join tt_users u on (l.user_id = u.id) $where";
-      } else {
-        $sql = "select sum(time_to_sec(l.duration)) as time,
-          sum(cast(l.billable * coalesce(upb.rate, 0) * time_to_sec(l.duration)/3600 as decimal(10,2))) as cost,
-          null as expenses
-          from tt_log l
-          left join tt_user_project_binds upb on (l.user_id = upb.user_id and l.project_id = upb.project_id) $where";
-      }
-    } else
-      $sql = "select sum(time_to_sec(l.duration)) as time, null as cost, null as expenses from tt_log l $where";
-
-    // If we have expenses, query becomes a bit more complex.
-    if ($report['show_cost'] && $user->isPluginEnabled('ex')) {
-      $where = ttReportHelper::getFavExpenseWhere($report);
-      $sql_for_expenses = "select null as time, sum(cost) as cost, sum(cost) as expenses from tt_expense_items ei $where";
-      // Create a combined query.
-      $sql = "select sum(time) as time, sum(cost) as cost, sum(expenses) as expenses from (($sql) union all ($sql_for_expenses)) t";
-    }
-
-    // Execute query.
-    $res = $mdb2->query($sql);
-    if (is_a($res, 'PEAR_Error')) die($res->getMessage());
-
-    $val = $res->fetchRow();
-    $total_time = $val['time'] ? sec_to_time_fmt_hm($val['time']) : null;
-    if ($report['show_cost']) {
-      $total_cost = $val['cost'];
-      if (!$total_cost) $total_cost = '0.00';
-      if ('.' != $user->decimal_mark)
-        $total_cost = str_replace('.', $user->decimal_mark, $total_cost);
-      $total_expenses = $val['expenses'];
-      if (!$total_expenses) $total_expenses = '0.00';
-      if ('.' != $user->decimal_mark)
-        $total_expenses = str_replace('.', $user->decimal_mark, $total_expenses);
-    }
-
-    if ($report['period'])
-      $period = new Period($report['period'], new DateAndTime($user->date_format));
-    else {
-      $period = new Period();
-      $period->setPeriod(
-        new DateAndTime($user->date_format, $report['period_start']),
-        new DateAndTime($user->date_format, $report['period_end']));
-    }
-
-    $totals['start_date'] = $period->getBeginDate();
-    $totals['end_date'] = $period->getEndDate();
-    $totals['time'] = $total_time;
+    $totals['units'] = $val['units'];
     $totals['cost'] = $total_cost;
     $totals['expenses'] = $total_expenses;
 
@@ -1025,44 +628,133 @@ class ttReportHelper {
   }
 
   // The assignToInvoice assigns a set of records to a specific invoice.
-  static function assignToInvoice($invoice_id, $time_log_ids, $expense_item_ids)
-  {
+  static function assignToInvoice($invoice_id, $time_log_ids, $expense_item_ids) {
+    global $user;
     $mdb2 = getConnection();
+
+    $group_id = $user->getGroup();
+    $org_id = $user->org_id;
+
     if ($time_log_ids) {
       $sql = "update tt_log set invoice_id = ".$mdb2->quote($invoice_id).
-        " where id in(".join(', ', $time_log_ids).")";
+        " where id in(".join(', ', $time_log_ids).") and group_id = $group_id and org_id = $org_id";
       $affected = $mdb2->exec($sql);
       if (is_a($affected, 'PEAR_Error')) die($affected->getMessage());
     }
     if ($expense_item_ids) {
       $sql = "update tt_expense_items set invoice_id = ".$mdb2->quote($invoice_id).
-        " where id in(".join(', ', $expense_item_ids).")";
+        " where id in(".join(', ', $expense_item_ids).") and group_id = $group_id and org_id = $org_id";
+      $affected = $mdb2->exec($sql);
+      if (is_a($affected, 'PEAR_Error')) die($affected->getMessage());
+    }
+  }
+
+  // The assignToTimesheet assigns a set of tt_log records to a specific timesheet.
+  static function assignToTimesheet($timesheet_id, $time_log_ids) {
+    global $user;
+    $mdb2 = getConnection();
+
+    $user_id = $user->getUser();
+    $group_id = $user->getGroup();
+    $org_id = $user->org_id;
+
+    if ($time_log_ids) {
+      // Use inner join as a protection mechanism not to do anything with "acted upon" timesheets.
+      // Allow oprations only with pending timesheets.
+      if ($timesheet_id) {
+        // Assigning a timesheet to records.
+        $inner_join = " inner join tt_timesheets ts on (ts.id = $timesheet_id".
+          " and ts.user_id = $user_id and ts.approve_status is null". // Timesheet to assign to is pending.
+          // Part below: existing timesheet either not exists or is also pending.
+          " and (l.timesheet_id is null or (l.timesheet_id = ts.id and ts.approve_status is null)))";
+      } else {
+        $inner_join = " inner join tt_timesheets ts on (ts.id = l.timesheet_id".
+          " and ts.user_id = $user_id and ts.approve_status is null)"; // Do not deassign from acted-upon timesheets.
+      }
+
+      $sql = "update tt_log l $inner_join".
+        " set l.timesheet_id = ".$mdb2->quote($timesheet_id).
+        " where l.id in(".join(', ', $time_log_ids).") and l.user_id = $user_id and l.group_id = $group_id and l.org_id = $org_id";
+      $affected = $mdb2->exec($sql);
+      if (is_a($affected, 'PEAR_Error')) die($affected->getMessage());
+    }
+  }
+
+  // The markApproved marks a set of records as either approved or unapproved.
+  static function markApproved($time_log_ids, $expense_item_ids, $approved = true) {
+    global $user;
+    $mdb2 = getConnection();
+
+    $group_id = $user->getGroup();
+    $org_id = $user->org_id;
+
+    $approved_val = (int) $approved;
+    if ($time_log_ids) {
+      $sql = "update tt_log set approved = $approved_val".
+        " where id in(".join(', ', $time_log_ids).") and group_id = $group_id and org_id = $org_id";
+      $affected = $mdb2->exec($sql);
+      if (is_a($affected, 'PEAR_Error')) die($affected->getMessage());
+    }
+    if ($expense_item_ids) {
+      $sql = "update tt_expense_items set approved = $approved_val".
+        " where id in(".join(', ', $expense_item_ids).") and group_id = $group_id and org_id = $org_id";
+      $affected = $mdb2->exec($sql);
+      if (is_a($affected, 'PEAR_Error')) die($affected->getMessage());
+    }
+  }
+
+  // The markPaid marks a set of records as either paid or unpaid.
+  static function markPaid($time_log_ids, $expense_item_ids, $paid = true) {
+    global $user;
+    $mdb2 = getConnection();
+
+    $group_id = $user->getGroup();
+    $org_id = $user->org_id;
+
+    $paid_val = (int) $paid;
+    if ($time_log_ids) {
+      $sql = "update tt_log set paid = $paid_val".
+        " where id in(".join(', ', $time_log_ids).") and group_id = $group_id and org_id = $org_id";
+      $affected = $mdb2->exec($sql);
+      if (is_a($affected, 'PEAR_Error')) die($affected->getMessage());
+    }
+    if ($expense_item_ids) {
+      $sql = "update tt_expense_items set paid = $paid_val".
+        " where id in(".join(', ', $expense_item_ids).") and group_id = $group_id and org_id = $org_id";
       $affected = $mdb2->exec($sql);
       if (is_a($affected, 'PEAR_Error')) die($affected->getMessage());
     }
   }
 
   // prepareReportBody - prepares an email body for report.
-  static function prepareReportBody($bean, $comment)
+  static function prepareReportBody($options, $comment = null)
   {
     global $user;
     global $i18n;
 
-    $items = ttReportHelper::getItems($bean);
-    $group_by = $bean->getAttribute('group_by');
-    if ($group_by && 'no_grouping' != $group_by)
-      $subtotals = ttReportHelper::getSubtotals($bean);
-    $totals = ttReportHelper::getTotals($bean);
+    // Determine these once as they are used in multiple places in this function.
+    $canViewReports = $user->can('view_reports') || $user->can('view_all_reports');
+    $isClient = $user->isClient();
+
+    $config = new ttConfigHelper($user->getConfig());
+    $show_note_column = $options['show_note'] && !$config->getDefinedValue('report_note_on_separate_row');
+    $show_note_row = $options['show_note'] && $config->getDefinedValue('report_note_on_separate_row');
+
+    $items = ttReportHelper::getItems($options);
+    $grouping = ttReportHelper::grouping($options);
+    if ($grouping)
+      $subtotals = ttReportHelper::getSubtotals($options);
+    $totals = ttReportHelper::getTotals($options);
 
     // Use custom fields plugin if it is enabled.
     if ($user->isPluginEnabled('cf'))
-      $custom_fields = new CustomFields($user->team_id);
+      $custom_fields = new CustomFields();
 
     // Define some styles to use in email.
     $style_title = 'text-align: center; font-size: 15pt; font-family: Arial, Helvetica, sans-serif;';
     $tableHeader = 'font-weight: bold; background-color: #a6ccf7; text-align: left;';
     $tableHeaderCentered = 'font-weight: bold; background-color: #a6ccf7; text-align: center;';
-    $rowItem = 'background-color: #ccccce;';
+    $rowItem = 'background-color: #ffffff;';
     $rowItemAlt = 'background-color: #f5f5f5;';
     $rowSubtotal = 'background-color: #e0e0e0;';
     $cellLeftAligned = 'text-align: left; vertical-align: top;';
@@ -1070,47 +762,65 @@ class ttReportHelper {
     $cellLeftAlignedSubtotal = 'font-weight: bold; text-align: left; vertical-align: top;';
     $cellRightAlignedSubtotal = 'font-weight: bold; text-align: right; vertical-align: top;';
 
+    // Determine column span for note field.
+    $colspan = 1;
+    if ($user->can('view_reports') || $user->can('view_all_reports') || $user->isClient()) $colspan++;
+    if ($options['show_client']) $colspan++;
+    if ($options['show_project']) $colspan++;
+    if ($options['show_task']) $colspan++;
+    if ($options['show_custom_field_1']) $colspan++;
+    if ($options['show_start']) $colspan++;
+    if ($options['show_end']) $colspan++;
+    if ($options['show_duration']) $colspan++;
+    if ($options['show_work_units']) $colspan++;
+    if ($options['show_cost']) $colspan++;
+    if ($options['show_approved']) $colspan++;
+    if ($options['show_paid']) $colspan++;
+    if ($options['show_ip']) $colspan++;
+    if ($options['show_invoice']) $colspan++;
+    if ($options['show_timesheet']) $colspan++;
+
     // Start creating email body.
     $body = '<html>';
     $body .= '<head><meta http-equiv="content-type" content="text/html; charset='.CHARSET.'"></head>';
     $body .= '<body>';
 
     // Output title.
-    $body .= '<p style="'.$style_title.'">'.$i18n->getKey('form.mail.report_subject').': '.$totals['start_date'].' - '.$totals['end_date'].'</p>';
+    $body .= '<p style="'.$style_title.'">'.$i18n->get('form.mail.report_subject').': '.$totals['start_date'].' - '.$totals['end_date'].'</p>';
 
     // Output comment.
     if ($comment) $body .= '<p>'.htmlspecialchars($comment).'</p>';
 
-    if ($bean->getAttribute('chtotalsonly')) {
+    if ($options['show_totals_only']) {
       // Totals only report. Output subtotals.
-
-      // Determine group_by header.
-      if ('cf_1' == $group_by)
-        $group_by_header = htmlspecialchars($custom_fields->fields[0]['label']);
-      else {
-        $key = 'label.'.$group_by;
-        $group_by_header = $i18n->getKey($key);
-      }
+      $group_by_header = ttReportHelper::makeGroupByHeader($options);
 
       $body .= '<table border="0" cellpadding="4" cellspacing="0" width="100%">';
       $body .= '<tr>';
       $body .= '<td style="'.$tableHeader.'">'.$group_by_header.'</td>';
-      if ($bean->getAttribute('chduration'))
-        $body .= '<td style="'.$tableHeaderCentered.'" width="5%">'.$i18n->getKey('label.duration').'</td>';
-      if ($bean->getAttribute('chcost'))
-        $body .= '<td style="'.$tableHeaderCentered.'" width="5%">'.$i18n->getKey('label.cost').'</td>';
+      if ($options['show_duration'])
+        $body .= '<td style="'.$tableHeaderCentered.'" width="5%">'.$i18n->get('label.duration').'</td>';
+      if ($options['show_work_units'])
+        $body .= '<td style="'.$tableHeaderCentered.'" width="5%">'.$i18n->get('label.work_units_short').'</td>';
+      if ($options['show_cost'])
+        $body .= '<td style="'.$tableHeaderCentered.'" width="5%">'.$i18n->get('label.cost').'</td>';
       $body .= '</tr>';
       foreach($subtotals as $subtotal) {
         $body .= '<tr style="'.$rowSubtotal.'">';
         $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.($subtotal['name'] ? htmlspecialchars($subtotal['name']) : '&nbsp;').'</td>';
-        if ($bean->getAttribute('chduration')) {
+        if ($options['show_duration']) {
           $body .= '<td style="'.$cellRightAlignedSubtotal.'">';
           if ($subtotal['time'] <> '0:00') $body .= $subtotal['time'];
           $body .= '</td>';
         }
-        if ($bean->getAttribute('chcost')) {
+        if ($options['show_work_units']) {
           $body .= '<td style="'.$cellRightAlignedSubtotal.'">';
-          $body .= ($user->canManageTeam() || $user->isClient()) ? $subtotal['cost'] : $subtotal['expenses'];
+          $body .= $subtotal['units'];
+          $body .= '</td>';
+        }
+        if ($options['show_cost']) {
+          $body .= '<td style="'.$cellRightAlignedSubtotal.'">';
+          $body .= ($canViewReports || $isClient) ? $subtotal['cost'] : $subtotal['expenses'];
           $body .= '</td>';
         }
         $body .= '</tr>';
@@ -1119,15 +829,20 @@ class ttReportHelper {
       // Print totals.
       $body .= '<tr><td>&nbsp;</td></tr>';
       $body .= '<tr style="'.$rowSubtotal.'">';
-      $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.$i18n->getKey('label.total').'</td>';
-      if ($bean->getAttribute('chduration')) {
+      $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.$i18n->get('label.total').'</td>';
+      if ($options['show_duration']) {
         $body .= '<td style="'.$cellRightAlignedSubtotal.'">';
         if ($totals['time'] <> '0:00') $body .= $totals['time'];
         $body .= '</td>';
       }
-      if ($bean->getAttribute('chcost')) {
+      if ($options['show_work_units']) {
+        $body .= '<td style="'.$cellRightAlignedSubtotal.'">';
+        $body .= $totals['units'];
+        $body .= '</td>';
+      }
+      if ($options['show_cost']) {
         $body .= '<td nowrap style="'.$cellRightAlignedSubtotal.'">'.htmlspecialchars($user->currency).' ';
-        $body .= ($user->canManageTeam() || $user->isClient()) ? $totals['cost'] : $totals['expenses'];
+        $body .= ($canViewReports || $isClient) ? $totals['cost'] : $totals['expenses'];
         $body .= '</td>';
       }
       $body .= '</tr>';
@@ -1139,33 +854,43 @@ class ttReportHelper {
       // Print table header.
       $body .= '<table border="0" cellpadding="4" cellspacing="0" width="100%">';
       $body .= '<tr>';
-      $body .= '<td style="'.$tableHeader.'">'.$i18n->getKey('label.date').'</td>';
-      if ($user->canManageTeam() || $user->isClient())
-        $body .= '<td style="'.$tableHeader.'">'.$i18n->getKey('label.user').'</td>';
-      if ($bean->getAttribute('chclient'))
-        $body .= '<td style="'.$tableHeader.'">'.$i18n->getKey('label.client').'</td>';
-      if ($bean->getAttribute('chproject'))
-        $body .= '<td style="'.$tableHeader.'">'.$i18n->getKey('label.project').'</td>';
-      if ($bean->getAttribute('chtask'))
-        $body .= '<td style="'.$tableHeader.'">'.$i18n->getKey('label.task').'</td>';
-      if ($bean->getAttribute('chcf_1'))
+      $body .= '<td style="'.$tableHeader.'">'.$i18n->get('label.date').'</td>';
+      if ($canViewReports || $isClient)
+        $body .= '<td style="'.$tableHeader.'">'.$i18n->get('label.user').'</td>';
+      if ($options['show_client'])
+        $body .= '<td style="'.$tableHeader.'">'.$i18n->get('label.client').'</td>';
+      if ($options['show_project'])
+        $body .= '<td style="'.$tableHeader.'">'.$i18n->get('label.project').'</td>';
+      if ($options['show_task'])
+        $body .= '<td style="'.$tableHeader.'">'.$i18n->get('label.task').'</td>';
+      if ($options['show_custom_field_1'])
         $body .= '<td style="'.$tableHeader.'">'.htmlspecialchars($custom_fields->fields[0]['label']).'</td>';
-      if ($bean->getAttribute('chstart'))
-        $body .= '<td style="'.$tableHeaderCentered.'" width="5%">'.$i18n->getKey('label.start').'</td>';
-      if ($bean->getAttribute('chfinish'))
-        $body .= '<td style="'.$tableHeaderCentered.'" width="5%">'.$i18n->getKey('label.finish').'</td>';
-      if ($bean->getAttribute('chduration'))
-        $body .= '<td style="'.$tableHeaderCentered.'" width="5%">'.$i18n->getKey('label.duration').'</td>';
-      if ($bean->getAttribute('chnote'))
-        $body .= '<td style="'.$tableHeader.'">'.$i18n->getKey('label.note').'</td>';
-      if ($bean->getAttribute('chcost'))
-        $body .= '<td style="'.$tableHeaderCentered.'" width="5%">'.$i18n->getKey('label.cost').'</td>';
-      if ($bean->getAttribute('chinvoice'))
-        $body .= '<td style="'.$tableHeader.'">'.$i18n->getKey('label.invoice').'</td>';
+      if ($options['show_start'])
+        $body .= '<td style="'.$tableHeaderCentered.'" width="5%">'.$i18n->get('label.start').'</td>';
+      if ($options['show_end'])
+        $body .= '<td style="'.$tableHeaderCentered.'" width="5%">'.$i18n->get('label.finish').'</td>';
+      if ($options['show_duration'])
+        $body .= '<td style="'.$tableHeaderCentered.'" width="5%">'.$i18n->get('label.duration').'</td>';
+      if ($options['show_work_units'])
+        $body .= '<td style="'.$tableHeaderCentered.'" width="5%">'.$i18n->get('label.work_units_short').'</td>';
+      if ($show_note_column)
+        $body .= '<td style="'.$tableHeader.'">'.$i18n->get('label.note').'</td>';
+      if ($options['show_cost'])
+        $body .= '<td style="'.$tableHeaderCentered.'" width="5%">'.$i18n->get('label.cost').'</td>';
+      if ($options['show_approved'])
+        $body .= '<td style="'.$tableHeaderCentered.'" width="5%">'.$i18n->get('label.approved').'</td>';
+      if ($options['show_paid'])
+        $body .= '<td style="'.$tableHeaderCentered.'" width="5%">'.$i18n->get('label.paid').'</td>';
+      if ($options['show_ip'])
+        $body .= '<td style="'.$tableHeaderCentered.'" width="5%">'.$i18n->get('label.ip').'</td>';
+      if ($options['show_invoice'])
+        $body .= '<td style="'.$tableHeader.'">'.$i18n->get('label.invoice').'</td>';
+      if ($options['show_timesheet'])
+        $body .= '<td style="'.$tableHeader.'">'.$i18n->get('label.timesheet').'</td>';
       $body .= '</tr>';
 
       // Initialize variables to print subtotals.
-      if ($items && 'no_grouping' != $group_by) {
+      if ($items && $grouping) {
         $print_subtotals = true;
         $first_pass = true;
         $prev_grouped_by = '';
@@ -1185,23 +910,28 @@ class ttReportHelper {
             $cur_grouped_by = $record['grouped_by'];
             if ($cur_grouped_by != $prev_grouped_by && !$first_pass) {
               $body .= '<tr style="'.$rowSubtotal.'">';
-              $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.$i18n->getKey('label.subtotal').'</td>';
+              $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.$i18n->get('label.subtotal').'</td>';
               $subtotal_name = htmlspecialchars($subtotals[$prev_grouped_by]['name']);
-              if ($user->canManageTeam() || $user->isClient()) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.($group_by == 'user' ? $subtotal_name : '').'</td>';
-              if ($bean->getAttribute('chclient')) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.($group_by == 'client' ? $subtotal_name : '').'</td>';
-              if ($bean->getAttribute('chproject')) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.($group_by == 'project' ? $subtotal_name : '').'</td>';
-              if ($bean->getAttribute('chtask')) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.($group_by == 'task' ? $subtotal_name : '').'</td>';
-              if ($bean->getAttribute('chcf_1')) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.($group_by == 'cf_1' ? $subtotal_name : '').'</td>';
-              if ($bean->getAttribute('chstart')) $body .= '<td></td>';
-              if ($bean->getAttribute('chfinish')) $body .= '<td></td>';
-              if ($bean->getAttribute('chduration')) $body .= '<td style="'.$cellRightAlignedSubtotal.'">'.$subtotals[$prev_grouped_by]['time'].'</td>';
-              if ($bean->getAttribute('chnote')) $body .= '<td></td>';
-              if ($bean->getAttribute('chcost')) {
+              if ($canViewReports || $isClient) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.$subtotals[$prev_grouped_by]['user'].'</td>';
+              if ($options['show_client']) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.$subtotals[$prev_grouped_by]['client'].'</td>';
+              if ($options['show_project']) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.$subtotals[$prev_grouped_by]['project'].'</td>';
+              if ($options['show_task']) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.$subtotals[$prev_grouped_by]['task'].'</td>';
+              if ($options['show_custom_field_1']) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.$subtotals[$prev_grouped_by]['cf_1'].'</td>';
+              if ($options['show_start']) $body .= '<td></td>';
+              if ($options['show_end']) $body .= '<td></td>';
+              if ($options['show_duration']) $body .= '<td style="'.$cellRightAlignedSubtotal.'">'.$subtotals[$prev_grouped_by]['time'].'</td>';
+              if ($options['show_work_units']) $body .= '<td style="'.$cellRightAlignedSubtotal.'">'.$subtotals[$prev_grouped_by]['units'].'</td>';
+              if ($show_note_column) $body .= '<td></td>';
+              if ($options['show_cost']) {
                 $body .= '<td style="'.$cellRightAlignedSubtotal.'">';
-                $body .= ($user->canManageTeam() || $user->isClient()) ? $subtotals[$prev_grouped_by]['cost'] : $subtotals[$prev_grouped_by]['expenses'];
+                $body .= ($canViewReports || $isClient) ? $subtotals[$prev_grouped_by]['cost'] : $subtotals[$prev_grouped_by]['expenses'];
                 $body .= '</td>';
               }
-              if ($bean->getAttribute('chinvoice')) $body .= '<td></td>';
+              if ($options['show_approved']) $body .= '<td></td>';
+              if ($options['show_paid']) $body .= '<td></td>';
+              if ($options['show_ip']) $body .= '<td></td>';
+              if ($options['show_invoice']) $body .= '<td></td>';
+              if ($options['show_timesheet']) $body .= '<td></td>';
               $body .= '</tr>';
               $body .= '<tr><td>&nbsp;</td></tr>';
             }
@@ -1213,30 +943,54 @@ class ttReportHelper {
             $row_style = ($row_style == $rowItem) ? $rowItemAlt : $rowItem;
           $body .= '<tr style="'.$row_style.'">';
           $body .= '<td style="'.$cellLeftAligned.'">'.$record['date'].'</td>';
-          if ($user->canManageTeam() || $user->isClient())
+          if ($canViewReports || $isClient)
             $body .= '<td style="'.$cellLeftAligned.'">'.htmlspecialchars($record['user']).'</td>';
-          if ($bean->getAttribute('chclient'))
+          if ($options['show_client'])
             $body .= '<td style="'.$cellLeftAligned.'">'.htmlspecialchars($record['client']).'</td>';
-          if ($bean->getAttribute('chproject'))
+          if ($options['show_project'])
             $body .= '<td style="'.$cellLeftAligned.'">'.htmlspecialchars($record['project']).'</td>';
-          if ($bean->getAttribute('chtask'))
+          if ($options['show_task'])
             $body .= '<td style="'.$cellLeftAligned.'">'.htmlspecialchars($record['task']).'</td>';
-          if ($bean->getAttribute('chcf_1'))
+          if ($options['show_custom_field_1'])
             $body .= '<td style="'.$cellLeftAligned.'">'.htmlspecialchars($record['cf_1']).'</td>';
-          if ($bean->getAttribute('chstart'))
+          if ($options['show_start'])
             $body .= '<td nowrap style="'.$cellRightAligned.'">'.$record['start'].'</td>';
-          if ($bean->getAttribute('chfinish'))
+          if ($options['show_end'])
             $body .= '<td nowrap style="'.$cellRightAligned.'">'.$record['finish'].'</td>';
-          if ($bean->getAttribute('chduration'))
+          if ($options['show_duration'])
             $body .= '<td style="'.$cellRightAligned.'">'.$record['duration'].'</td>';
-          if ($bean->getAttribute('chnote'))
+          if ($options['show_work_units'])
+            $body .= '<td style="'.$cellRightAligned.'">'.$record['units'].'</td>';
+          if ($show_note_column)
             $body .= '<td style="'.$cellLeftAligned.'">'.htmlspecialchars($record['note']).'</td>';
-          if ($bean->getAttribute('chcost'))
+          if ($options['show_cost'])
             $body .= '<td style="'.$cellRightAligned.'">'.$record['cost'].'</td>';
-          if ($bean->getAttribute('chinvoice'))
+          if ($options['show_approved']) {
+            $body .= '<td style="'.$cellRightAligned.'">';
+            $body .= $record['approved'] == 1 ? $i18n->get('label.yes') : $i18n->get('label.no');
+            $body .= '</td>';
+          }
+          if ($options['show_paid']) {
+            $body .= '<td style="'.$cellRightAligned.'">';
+            $body .= $record['paid'] == 1 ? $i18n->get('label.yes') : $i18n->get('label.no');
+            $body .= '</td>';
+          }
+          if ($options['show_ip']) {
+            $body .= '<td style="'.$cellRightAligned.'">';
+            $body .= $record['modified'] ? $record['modified_ip'].' '.$record['modified'] : $record['created_ip'].' '.$record['created'];
+            $body .= '</td>';
+          }
+          if ($options['show_invoice'])
             $body .= '<td style="'.$cellRightAligned.'">'.htmlspecialchars($record['invoice']).'</td>';
+          if ($options['show_timesheet'])
+            $body .= '<td style="'.$cellRightAligned.'">'.htmlspecialchars($record['timesheet']).'</td>';
           $body .= '</tr>';
-
+          if ($show_note_row && $record['note']) {
+            $body .= '<tr style="'.$row_style.'">';
+            $body .= '<td style="'.$cellRightAligned.'">'.$i18n->get('label.note').':</td>';
+            $body .= '<td colspan="'.$colspan.'">'.$record['note'].'</td>';
+            $body .= '</tr>';
+          }
           $prev_date = $record['date'];
           if ($print_subtotals)
             $prev_grouped_by = $record['grouped_by'];
@@ -1246,45 +1000,55 @@ class ttReportHelper {
       // Print a terminating subtotal.
       if ($print_subtotals) {
         $body .= '<tr style="'.$rowSubtotal.'">';
-        $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.$i18n->getKey('label.subtotal').'</td>';
+        $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.$i18n->get('label.subtotal').'</td>';
         $subtotal_name = htmlspecialchars($subtotals[$cur_grouped_by]['name']);
-        if ($user->canManageTeam() || $user->isClient()) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.($group_by == 'user' ? $subtotal_name : '').'</td>';
-        if ($bean->getAttribute('chclient')) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.($group_by == 'client' ? $subtotal_name : '').'</td>';
-        if ($bean->getAttribute('chproject')) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.($group_by == 'project' ? $subtotal_name : '').'</td>';
-        if ($bean->getAttribute('chtask')) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.($group_by == 'task' ? $subtotal_name : '').'</td>';
-        if ($bean->getAttribute('chcf_1')) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.($group_by == 'cf_1' ? $subtotal_name : '').'</td>';
-        if ($bean->getAttribute('chstart')) $body .= '<td></td>';
-        if ($bean->getAttribute('chfinish')) $body .= '<td></td>';
-        if ($bean->getAttribute('chduration')) $body .= '<td style="'.$cellRightAlignedSubtotal.'">'.$subtotals[$cur_grouped_by]['time'].'</td>';
-        if ($bean->getAttribute('chnote')) $body .= '<td></td>';
-        if ($bean->getAttribute('chcost')) {
+        if ($canViewReports || $isClient) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.$subtotals[$prev_grouped_by]['user'].'</td>';
+        if ($options['show_client']) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.$subtotals[$prev_grouped_by]['client'].'</td>';
+        if ($options['show_project']) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.$subtotals[$prev_grouped_by]['project'].'</td>';
+        if ($options['show_task']) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.$subtotals[$prev_grouped_by]['task'].'</td>';
+        if ($options['show_custom_field_1']) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.$subtotals[$prev_grouped_by]['cf_1'].'</td>';
+        if ($options['show_start']) $body .= '<td></td>';
+        if ($options['show_end']) $body .= '<td></td>';
+        if ($options['show_duration']) $body .= '<td style="'.$cellRightAlignedSubtotal.'">'.$subtotals[$cur_grouped_by]['time'].'</td>';
+        if ($options['show_work_units']) $body .= '<td style="'.$cellRightAlignedSubtotal.'">'.$subtotals[$cur_grouped_by]['units'].'</td>';
+        if ($show_note_column) $body .= '<td></td>';
+        if ($options['show_cost']) {
           $body .= '<td style="'.$cellRightAlignedSubtotal.'">';
-          $body .= ($user->canManageTeam() || $user->isClient()) ? $subtotals[$cur_grouped_by]['cost'] : $subtotals[$cur_grouped_by]['expenses'];
+          $body .= ($canViewReports || $isClient) ? $subtotals[$cur_grouped_by]['cost'] : $subtotals[$cur_grouped_by]['expenses'];
           $body .= '</td>';
         }
-        if ($bean->getAttribute('chinvoice')) $body .= '<td></td>';
+        if ($options['show_approved']) $body .= '<td></td>';
+        if ($options['show_paid']) $body .= '<td></td>';
+        if ($options['show_ip']) $body .= '<td></td>';
+        if ($options['show_invoice']) $body .= '<td></td>';
+        if ($options['show_timesheet']) $body .= '<td></td>';
         $body .= '</tr>';
       }
 
       // Print totals.
       $body .= '<tr><td>&nbsp;</td></tr>';
       $body .= '<tr style="'.$rowSubtotal.'">';
-      $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.$i18n->getKey('label.total').'</td>';
-      if ($user->canManageTeam() || $user->isClient()) $body .= '<td></td>';
-      if ($bean->getAttribute('chclient')) $body .= '<td></td>';
-      if ($bean->getAttribute('chproject')) $body .= '<td></td>';
-      if ($bean->getAttribute('chtask')) $body .= '<td></td>';
-      if ($bean->getAttribute('chcf_1')) $body .= '<td></td>';
-      if ($bean->getAttribute('chstart')) $body .= '<td></td>';
-      if ($bean->getAttribute('chfinish')) $body .= '<td></td>';
-      if ($bean->getAttribute('chduration')) $body .= '<td style="'.$cellRightAlignedSubtotal.'">'.$totals['time'].'</td>';
-      if ($bean->getAttribute('chnote')) $body .= '<td></td>';
-      if ($bean->getAttribute('chcost')) {
+      $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.$i18n->get('label.total').'</td>';
+      if ($canViewReports || $isClient) $body .= '<td></td>';
+      if ($options['show_client']) $body .= '<td></td>';
+      if ($options['show_project']) $body .= '<td></td>';
+      if ($options['show_task']) $body .= '<td></td>';
+      if ($options['show_custom_field_1']) $body .= '<td></td>';
+      if ($options['show_start']) $body .= '<td></td>';
+      if ($options['show_end']) $body .= '<td></td>';
+      if ($options['show_duration']) $body .= '<td style="'.$cellRightAlignedSubtotal.'">'.$totals['time'].'</td>';
+      if ($options['show_work_units']) $body .= '<td style="'.$cellRightAlignedSubtotal.'">'.$totals['units'].'</td>';
+      if ($show_note_column) $body .= '<td></td>';
+      if ($options['show_cost']) {
         $body .= '<td nowrap style="'.$cellRightAlignedSubtotal.'">'.htmlspecialchars($user->currency).' ';
-        $body .= ($user->canManageTeam() || $user->isClient()) ? $totals['cost'] : $totals['expenses'];
+        $body .= ($canViewReports || $isClient) ? $totals['cost'] : $totals['expenses'];
         $body .= '</td>';
       }
-      if ($bean->getAttribute('chinvoice')) $body .= '<td></td>';
+      if ($options['show_approved']) $body .= '<td></td>';
+      if ($options['show_paid']) $body .= '<td></td>';
+      if ($options['show_ip']) $body .= '<td></td>';
+      if ($options['show_invoice']) $body .= '<td></td>';
+      if ($options['show_timesheet']) $body .= '<td></td>';
       $body .= '</tr>';
 
       $body .= '</table>';
@@ -1292,7 +1056,7 @@ class ttReportHelper {
 
     // Output footer.
     if (!defined('REPORT_FOOTER') || !(REPORT_FOOTER == false))
-      $body .= '<p style="text-align: center;">'.$i18n->getKey('form.mail.footer').'</p>';
+      $body .= '<p style="text-align: center;">'.$i18n->get('form.mail.footer').'</p>';
 
     // Finish creating email body.
     $body .= '</body></html>';
@@ -1300,284 +1064,767 @@ class ttReportHelper {
     return $body;
   }
 
-  // prepareFavReportBody - prepares an email body for a favorite report.
-  static function prepareFavReportBody($report)
+  // checkFavReportCondition - checks whether it is okay to send fav report.
+  static function checkFavReportCondition($options, $condition)
   {
-    global $user;
-    global $i18n;
+    $items = ttReportHelper::getItems($options);
 
-    $items = ttReportHelper::getFavItems($report);
-    $group_by = $report['group_by'];
-    if ($group_by && 'no_grouping' != $group_by)
-      $subtotals = ttReportHelper::getFavSubtotals($report);
-    $totals = ttReportHelper::getFavTotals($report);
+    $condition = trim(str_replace('count', '', $condition));
 
-    // Use custom fields plugin if it is enabled.
-    if ($user->isPluginEnabled('cf'))
-      $custom_fields = new CustomFields($user->team_id);
+    $greater_or_equal = ttStartsWith($condition, '>=');
+    if ($greater_or_equal) $condition = trim(str_replace('>=', '', $condition));
 
-    // Define some styles to use in email.
-    $style_title = 'text-align: center; font-size: 15pt; font-family: Arial, Helvetica, sans-serif;';
-    $tableHeader = 'font-weight: bold; background-color: #a6ccf7; text-align: left;';
-    $tableHeaderCentered = 'font-weight: bold; background-color: #a6ccf7; text-align: center;';
-    $rowItem = 'background-color: #ccccce;';
-    $rowItemAlt = 'background-color: #f5f5f5;';
-    $rowSubtotal = 'background-color: #e0e0e0;';
-    $cellLeftAligned = 'text-align: left; vertical-align: top;';
-    $cellRightAligned = 'text-align: right; vertical-align: top;';
-    $cellLeftAlignedSubtotal = 'font-weight: bold; text-align: left; vertical-align: top;';
-    $cellRightAlignedSubtotal = 'font-weight: bold; text-align: right; vertical-align: top;';
+    $less_or_equal = ttStartsWith($condition, '<=');
+    if ($less_or_equal) $condition = trim(str_replace('<=', '', $condition));
 
-    // Start creating email body.
-    $body = '<html>';
-    $body .= '<head><meta http-equiv="content-type" content="text/html; charset='.CHARSET.'"></head>';
-    $body .= '<body>';
+    $not_equal = ttStartsWith($condition, '<>');
+    if ($not_equal) $condition = trim(str_replace('<>', '', $condition));
 
-    // Output title.
-    $body .= '<p style="'.$style_title.'">'.$i18n->getKey('form.mail.report_subject').': '.$totals['start_date'].' - '.$totals['end_date'].'</p>';
+    $greater = ttStartsWith($condition, '>');
+    if ($greater) $condition = trim(str_replace('>', '', $condition));
 
-    // Output comment.
-    // if ($comment) $body .= '<p>'.htmlspecialchars($comment).'</p>'; // No comment for fav. reports.
+    $less = ttStartsWith($condition, '<');
+    if ($less) $condition = trim(str_replace('<', '', $condition));
 
-    if ($report['show_totals_only']) {
-      // Totals only report. Output subtotals.
+    $equal = ttStartsWith($condition, '=');
+    if ($equal) $condition = trim(str_replace('=', '', $condition));
 
-      // Determine group_by header.
-      if ('cf_1' == $group_by)
-        $group_by_header = htmlspecialchars($custom_fields->fields[0]['label']);
-      else {
-        $key = 'label.'.$group_by;
-        $group_by_header = $i18n->getKey($key);
-      }
+    $count_required = (int) $condition;
 
-      $body .= '<table border="0" cellpadding="4" cellspacing="0" width="100%">';
-      $body .= '<tr>';
-      $body .= '<td style="'.$tableHeader.'">'.$group_by_header.'</td>';
-      if ($report['show_duration'])
-        $body .= '<td style="'.$tableHeaderCentered.'" width="5%">'.$i18n->getKey('label.duration').'</td>';
-      if ($report['show_cost'])
-        $body .= '<td style="'.$tableHeaderCentered.'" width="5%">'.$i18n->getKey('label.cost').'</td>';
-      $body .= '</tr>';
-      foreach($subtotals as $subtotal) {
-        $body .= '<tr style="'.$rowSubtotal.'">';
-        $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.($subtotal['name'] ? htmlspecialchars($subtotal['name']) : '&nbsp;').'</td>';
-        if ($report['show_duration']) {
-          $body .= '<td style="'.$cellRightAlignedSubtotal.'">';
-          if ($subtotal['time'] <> '0:00') $body .= $subtotal['time'];
-          $body .= '</td>';
-        }
-        if ($report['show_cost']) {
-          $body .= '<td style="'.$cellRightAlignedSubtotal.'">';
-          $body .= ($user->canManageTeam() || $user->isClient()) ? $subtotal['cost'] : $subtotal['expenses'];
-          $body .= '</td>';
-        }
-        $body .= '</tr>';
-      }
+    if ($greater && count($items) > $count_required) return true;
+    if ($greater_or_equal && count($items) >= $count_required) return true;
+    if ($less && count($items) < $count_required) return true;
+    if ($less_or_equal && count($items) <= $count_required) return true;
+    if ($equal && count($items) == $count_required) return true;
+    if ($not_equal && count($items) <> $count_required) return true;
 
-      // Print totals.
-      $body .= '<tr><td>&nbsp;</td></tr>';
-      $body .= '<tr style="'.$rowSubtotal.'">';
-      $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.$i18n->getKey('label.total').'</td>';
-      if ($report['show_duration']) {
-        $body .= '<td style="'.$cellRightAlignedSubtotal.'">';
-        if ($totals['time'] <> '0:00') $body .= $totals['time'];
-        $body .= '</td>';
-      }
-      if ($report['show_cost']) {
-        $body .= '<td nowrap style="'.$cellRightAlignedSubtotal.'">'.htmlspecialchars($user->currency).' ';
-        $body .= ($user->canManageTeam() || $user->isClient()) ? $totals['cost'] : $totals['expenses'];
-        $body .= '</td>';
-      }
-      $body .= '</tr>';
-
-      $body .= '</table>';
-    } else {
-      // Regular report.
-
-      // Print table header.
-      $body .= '<table border="0" cellpadding="4" cellspacing="0" width="100%">';
-      $body .= '<tr>';
-      $body .= '<td style="'.$tableHeader.'">'.$i18n->getKey('label.date').'</td>';
-      if ($user->canManageTeam() || $user->isClient())
-        $body .= '<td style="'.$tableHeader.'">'.$i18n->getKey('label.user').'</td>';
-      if ($report['show_client'])
-        $body .= '<td style="'.$tableHeader.'">'.$i18n->getKey('label.client').'</td>';
-      if ($report['show_project'])
-        $body .= '<td style="'.$tableHeader.'">'.$i18n->getKey('label.project').'</td>';
-      if ($report['show_task'])
-        $body .= '<td style="'.$tableHeader.'">'.$i18n->getKey('label.task').'</td>';
-      if ($report['show_custom_field_1'])
-        $body .= '<td style="'.$tableHeader.'">'.htmlspecialchars($custom_fields->fields[0]['label']).'</td>';
-      if ($report['show_start'])
-        $body .= '<td style="'.$tableHeaderCentered.'" width="5%">'.$i18n->getKey('label.start').'</td>';
-      if ($report['show_end'])
-        $body .= '<td style="'.$tableHeaderCentered.'" width="5%">'.$i18n->getKey('label.finish').'</td>';
-      if ($report['show_duration'])
-        $body .= '<td style="'.$tableHeaderCentered.'" width="5%">'.$i18n->getKey('label.duration').'</td>';
-      if ($report['show_note'])
-        $body .= '<td style="'.$tableHeader.'">'.$i18n->getKey('label.note').'</td>';
-      if ($report['show_cost'])
-        $body .= '<td style="'.$tableHeaderCentered.'" width="5%">'.$i18n->getKey('label.cost').'</td>';
-      if ($report['show_invoice'])
-        $body .= '<td style="'.$tableHeader.'">'.$i18n->getKey('label.invoice').'</td>';
-      $body .= '</tr>';
-
-      // Initialize variables to print subtotals.
-      if ($items && 'no_grouping' != $group_by) {
-        $print_subtotals = true;
-        $first_pass = true;
-        $prev_grouped_by = '';
-        $cur_grouped_by = '';
-      }
-      // Initialize variables to alternate color of rows for different dates.
-      $prev_date = '';
-      $cur_date = '';
-      $row_style = $rowItem;
-
-      // Print report items.
-      if (is_array($items)) {
-        foreach ($items as $record) {
-          $cur_date = $record['date'];
-          // Print a subtotal row after a block of grouped items.
-          if ($print_subtotals) {
-            $cur_grouped_by = $record['grouped_by'];
-            if ($cur_grouped_by != $prev_grouped_by && !$first_pass) {
-              $body .= '<tr style="'.$rowSubtotal.'">';
-              $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.$i18n->getKey('label.subtotal').'</td>';
-              $subtotal_name = htmlspecialchars($subtotals[$prev_grouped_by]['name']);
-              if ($user->canManageTeam() || $user->isClient()) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.($group_by == 'user' ? $subtotal_name : '').'</td>';
-              if ($report['show_client']) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.($group_by == 'client' ? $subtotal_name : '').'</td>';
-              if ($report['show_project']) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.($group_by == 'project' ? $subtotal_name : '').'</td>';
-              if ($report['show_task']) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.($group_by == 'task' ? $subtotal_name : '').'</td>';
-              if ($report['show_custom_field_1']) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.($group_by == 'cf_1' ? $subtotal_name : '').'</td>';
-              if ($report['show_start']) $body .= '<td></td>';
-              if ($report['show_end']) $body .= '<td></td>';
-              if ($report['show_duration']) $body .= '<td style="'.$cellRightAlignedSubtotal.'">'.$subtotals[$prev_grouped_by]['time'].'</td>';
-              if ($report['show_note']) $body .= '<td></td>';
-              if ($report['show_cost']) {
-                $body .= '<td style="'.$cellRightAlignedSubtotal.'">';
-                $body .= ($user->canManageTeam() || $user->isClient()) ? $subtotals[$prev_grouped_by]['cost'] : $subtotals[$prev_grouped_by]['expenses'];
-                $body .= '</td>';
-              }
-              if ($report['show_invoice']) $body .= '<td></td>';
-              $body .= '</tr>';
-              $body .= '<tr><td>&nbsp;</td></tr>';
-            }
-            $first_pass = false;
-          }
-
-          // Print a regular row.
-          if ($cur_date != $prev_date)
-            $row_style = ($row_style == $rowItem) ? $rowItemAlt : $rowItem;
-          $body .= '<tr style="'.$row_style.'">';
-          $body .= '<td style="'.$cellLeftAligned.'">'.$record['date'].'</td>';
-          if ($user->canManageTeam() || $user->isClient())
-            $body .= '<td style="'.$cellLeftAligned.'">'.htmlspecialchars($record['user']).'</td>';
-          if ($report['show_client'])
-            $body .= '<td style="'.$cellLeftAligned.'">'.htmlspecialchars($record['client']).'</td>';
-          if ($report['show_project'])
-            $body .= '<td style="'.$cellLeftAligned.'">'.htmlspecialchars($record['project']).'</td>';
-          if ($report['show_task'])
-            $body .= '<td style="'.$cellLeftAligned.'">'.htmlspecialchars($record['task']).'</td>';
-          if ($report['show_custom_field_1'])
-            $body .= '<td style="'.$cellLeftAligned.'">'.htmlspecialchars($record['cf_1']).'</td>';
-          if ($report['show_start'])
-            $body .= '<td nowrap style="'.$cellRightAligned.'">'.$record['start'].'</td>';
-          if ($report['show_end'])
-            $body .= '<td nowrap style="'.$cellRightAligned.'">'.$record['finish'].'</td>';
-          if ($report['show_duration'])
-            $body .= '<td style="'.$cellRightAligned.'">'.$record['duration'].'</td>';
-          if ($report['show_note'])
-            $body .= '<td style="'.$cellLeftAligned.'">'.htmlspecialchars($record['note']).'</td>';
-          if ($report['show_cost'])
-            $body .= '<td style="'.$cellRightAligned.'">'.$record['cost'].'</td>';
-          if ($report['show_invoice'])
-            $body .= '<td style="'.$cellRightAligned.'">'.htmlspecialchars($record['invoice']).'</td>';
-          $body .= '</tr>';
-
-          $prev_date = $record['date'];
-          if ($print_subtotals)
-            $prev_grouped_by = $record['grouped_by'];
-        }
-      }
-
-      // Print a terminating subtotal.
-      if ($print_subtotals) {
-        $body .= '<tr style="'.$rowSubtotal.'">';
-        $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.$i18n->getKey('label.subtotal').'</td>';
-        $subtotal_name = htmlspecialchars($subtotals[$cur_grouped_by]['name']);
-        if ($user->canManageTeam() || $user->isClient()) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.($group_by == 'user' ? $subtotal_name : '').'</td>';
-        if ($report['show_client']) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.($group_by == 'client' ? $subtotal_name : '').'</td>';
-        if ($report['show_project']) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.($group_by == 'project' ? $subtotal_name : '').'</td>';
-        if ($report['show_task']) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.($group_by == 'task' ? $subtotal_name : '').'</td>';
-        if ($report['show_custom_field_1']) $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.($group_by == 'cf_1' ? $subtotal_name : '').'</td>';
-        if ($report['show_start']) $body .= '<td></td>';
-        if ($report['show_end']) $body .= '<td></td>';
-        if ($report['show_duration']) $body .= '<td style="'.$cellRightAlignedSubtotal.'">'.$subtotals[$cur_grouped_by]['time'].'</td>';
-        if ($report['show_note']) $body .= '<td></td>';
-        if ($report['show_cost']) {
-          $body .= '<td style="'.$cellRightAlignedSubtotal.'">';
-          $body .= ($user->canManageTeam() || $user->isClient()) ? $subtotals[$cur_grouped_by]['cost'] : $subtotals[$cur_grouped_by]['expenses'];
-          $body .= '</td>';
-        }
-        if ($report['show_invoice']) $body .= '<td></td>';
-        $body .= '</tr>';
-      }
-
-      // Print totals.
-      $body .= '<tr><td>&nbsp;</td></tr>';
-      $body .= '<tr style="'.$rowSubtotal.'">';
-      $body .= '<td style="'.$cellLeftAlignedSubtotal.'">'.$i18n->getKey('label.total').'</td>';
-      if ($user->canManageTeam() || $user->isClient()) $body .= '<td></td>';
-      if ($report['show_client']) $body .= '<td></td>';
-      if ($report['show_project']) $body .= '<td></td>';
-      if ($report['show_task']) $body .= '<td></td>';
-      if ($report['show_custom_field_1']) $body .= '<td></td>';
-      if ($report['show_start']) $body .= '<td></td>';
-      if ($report['show_end']) $body .= '<td></td>';
-      if ($report['show_duration']) $body .= '<td style="'.$cellRightAlignedSubtotal.'">'.$totals['time'].'</td>';
-      if ($report['show_note']) $body .= '<td></td>';
-      if ($report['show_cost']) {
-        $body .= '<td nowrap style="'.$cellRightAlignedSubtotal.'">'.htmlspecialchars($user->currency).' ';
-        $body .= ($user->canManageTeam() || $user->isClient()) ? $totals['cost'] : $totals['expenses'];
-        $body .= '</td>';
-      }
-      if ($report['show_invoice']) $body .= '<td></td>';
-      $body .= '</tr>';
-
-      $body .= '</table>';
-    }
-
-    // Output footer.
-    if (!defined('REPORT_FOOTER') || !(REPORT_FOOTER == false))
-      $body .= '<p style="text-align: center;">'.$i18n->getKey('form.mail.footer').'</p>';
-
-    // Finish creating email body.
-    $body .= '</body></html>';
-
-    return $body;
+    return false;
   }
 
   // sendFavReport - sends a favorite report to a specified email, called from cron.php
-  static function sendFavReport($report, $email) {
+  static function sendFavReport($options, $subject, $email, $cc) {
     // We are called from cron.php, we have no $bean in session.
-    // cron.php set global $user and $i18n objects to match our favorite report user.
+    // cron.php sets global $user and $i18n objects to match our favorite report user.
     global $user;
     global $i18n;
 
     // Prepare report body.
-    $body = ttReportHelper::prepareFavReportBody($report);
+    $body = ttReportHelper::prepareReportBody($options);
 
     import('mail.Mailer');
     $mailer = new Mailer();
     $mailer->setCharSet(CHARSET);
     $mailer->setContentType('text/html');
     $mailer->setSender(SENDER);
+    if (!empty($cc))
+      $mailer->setReceiverCC($cc);
+    if (!empty($user->bcc_email))
+      $mailer->setReceiverBCC($user->bcc_email);
     $mailer->setReceiver($email);
     $mailer->setMailMode(MAIL_MODE);
-    if (!$mailer->send($report['name'], $body))
+    if (empty($subject)) $subject = $options['name'];
+    if (!$mailer->send($subject, $body))
       return false;
 
     return true;
+  }
+
+  // getReportOptions - returns an array of report options constructed from session bean.
+  //
+  // Note: similarly to ttFavReportHelper::getReportOptions, this function is a part of
+  // refactoring to simplify maintenance of report generating functions, as we currently
+  // have 2 sets: normal reporting (from bean), and fav report emailing (from db fields).
+  // Using options obtained from either db or bean shall allow us to use only one set of functions.
+  static function getReportOptions($bean) {
+    global $user;
+
+    // Prepare an array of report options.
+    $options = array();
+
+    // Construct one by one.
+    $options['name'] = null; // No name required.
+    $options['user_id'] = $user->id; // Not sure if we need user_id here. Fav reports use it to recycle $user object in cron.php.
+    $options['client_id'] = $bean->getAttribute('client');
+    $options['cf_1_option_id'] = $bean->getAttribute('option');
+    $options['project_id'] = $bean->getAttribute('project');
+    $options['task_id'] = $bean->getAttribute('task');
+    $options['billable'] = $bean->getAttribute('include_records');
+    $options['invoice'] = $bean->getAttribute('invoice');
+    $options['paid_status'] = $bean->getAttribute('paid_status');
+    $options['approved'] = $bean->getAttribute('approved');
+    if ($user->isPluginEnabled('ap') && $user->isClient() && !$user->can('view_client_unapproved'))
+      $options['approved'] = 1; // Restrict clients to approved records only.
+    $options['timesheet'] = $bean->getAttribute('timesheet');
+
+    $active_users_in_bean = $bean->getAttribute('users_active');
+    if ($active_users_in_bean && is_array($active_users_in_bean)) {
+      $users = join(',', $active_users_in_bean);
+    }
+    $inactive_users_in_bean = $bean->getAttribute('users_inactive');
+    if ($inactive_users_in_bean && is_array($inactive_users_in_bean)) {
+      if ($users) $users .= ',';
+      $users .= join(',', $inactive_users_in_bean);
+    }
+    if ($users) $options['users'] = $users;
+
+    $options['period'] = $bean->getAttribute('period');
+    $options['period_start'] = $bean->getAttribute('start_date');
+    $options['period_end'] = $bean->getAttribute('end_date');
+    $options['show_client'] = $bean->getAttribute('chclient');
+    $options['show_invoice'] = $bean->getAttribute('chinvoice');
+    $options['show_approved'] = $bean->getAttribute('chapproved');
+    $options['show_paid'] = $bean->getAttribute('chpaid');
+    $options['show_ip'] = $bean->getAttribute('chip');
+    $options['show_project'] = $bean->getAttribute('chproject');
+    $options['show_start'] = $bean->getAttribute('chstart');
+    $options['show_duration'] = $bean->getAttribute('chduration');
+    $options['show_cost'] = $bean->getAttribute('chcost');
+    $options['show_task'] = $bean->getAttribute('chtask');
+    $options['show_end'] = $bean->getAttribute('chfinish');
+    $options['show_note'] = $bean->getAttribute('chnote');
+    $options['show_custom_field_1'] = $bean->getAttribute('chcf_1');
+    $options['show_work_units'] = $bean->getAttribute('chunits');
+    $options['show_timesheet'] = $bean->getAttribute('chtimesheet');
+    $options['show_files'] = $bean->getAttribute('chfiles');
+    $options['show_totals_only'] = $bean->getAttribute('chtotalsonly');
+    $options['group_by1'] = $bean->getAttribute('group_by1');
+    $options['group_by2'] = $bean->getAttribute('group_by2');
+    $options['group_by3'] = $bean->getAttribute('group_by3');
+    return $options;
+  }
+
+  // verifyBean is a security function to make sure data in bean makes sense for a group.
+  static function verifyBean($bean) {
+    global $user;
+
+    // Check users.
+    $active_users_in_bean = $bean->getAttribute('users_active');
+    $inactive_users_in_bean = $bean->getAttribute('users_inactive');
+    if (is_array($active_users_in_bean) || is_array($inactive_users_in_bean)) {
+      $users_in_group = ttGroupHelper::getUsers();
+      foreach ($users_in_group as $user_in_group) {
+        $valid_ids[] = $user_in_group['id'];
+      }
+      foreach ($active_users_in_bean as $user_in_bean) {
+        if (!in_array($user_in_bean, $valid_ids)) {
+          return false;
+        }
+      }
+      foreach ($inactive_users_in_bean as $user_in_bean) {
+        if (!in_array($user_in_bean, $valid_ids)) {
+          return false;
+        }
+      }
+    }
+
+    // TODO: add additional checks here. Perhaps do it before saving the bean for consistency.
+    return true;
+  }
+
+  // makeGroupByKey builds a combined group by key from group_by1, group_by2 and group_by3 values
+  // (passed in $options) and a row of data ($row obtained from a db query).
+  static function makeGroupByKey($options, $row) {
+    if ($options['group_by1'] != null && $options['group_by1'] != 'no_grouping') {
+      // We have group_by1.
+      $group_by1 = $options['group_by1'];
+      $group_by1_value = $row[$group_by1];
+      //if ($group_by1 == 'date') $group_by1_value = ttDateToUserFormat($group_by1_value);
+      if (empty($group_by1_value)) $group_by1_value = 'Null'; // To match what comes out of makeConcatPart.
+      $group_by_key .= ' - '.$group_by1_value;
+    }
+    if ($options['group_by2'] != null && $options['group_by2'] != 'no_grouping') {
+      // We have group_by2.
+      $group_by2 = $options['group_by2'];
+      $group_by2_value = $row[$group_by2];
+      //if ($group_by2 == 'date') $group_by2_value = ttDateToUserFormat($group_by2_value);
+      if (empty($group_by2_value)) $group_by2_value = 'Null'; // To match what comes out of makeConcatPart.
+      $group_by_key .= ' - '.$group_by2_value;
+    }
+    if ($options['group_by3'] != null && $options['group_by3'] != 'no_grouping') {
+      // We have group_by3.
+      $group_by3 = $options['group_by3'];
+      $group_by3_value = $row[$group_by3];
+      //if ($group_by3 == 'date') $group_by3_value = ttDateToUserFormat($group_by3_value);
+      if (empty($group_by3_value)) $group_by3_value = 'Null'; // To match what comes out of makeConcatPart.
+      $group_by_key .= ' - '.$group_by3_value;
+    }
+    $group_by_key = trim($group_by_key, ' -');
+    return $group_by_key;
+  }
+
+  // makeGroupByPart builds a combined group by part for sql query for time items using group_by1,
+  // group_by2, and group_by3 values passed in $options.
+  static function makeGroupByPart($options) {
+    if (!ttReportHelper::grouping($options)) return null;
+
+    $group_by1 = $options['group_by1'];
+    $group_by2 = $options['group_by2'];
+    $group_by3 = $options['group_by3'];
+
+    switch ($group_by1) {
+      case 'date':
+        $group_by_parts .= ', l.date';
+        break;
+      case 'user':
+        $group_by_parts .= ', u.name';
+        break;
+      case 'client':
+        $group_by_parts .= ', c.name';
+        break;
+      case 'project':
+        $group_by_parts .= ', p.name';
+        break;
+      case 'task':
+        $group_by_parts .= ', t.name';
+        break;
+      case 'cf_1':
+        $group_by_parts .= ', cfo.value';
+        break;
+    }
+    switch ($group_by2) {
+      case 'date':
+        $group_by_parts .= ', l.date';
+        break;
+      case 'user':
+        $group_by_parts .= ', u.name';
+        break;
+      case 'client':
+        $group_by_parts .= ', c.name';
+        break;
+      case 'project':
+        $group_by_parts .= ', p.name';
+        break;
+      case 'task':
+        $group_by_parts .= ', t.name';
+        break;
+      case 'cf_1':
+        $group_by_parts .= ', cfo.value';
+        break;
+    }
+    switch ($group_by3) {
+      case 'date':
+        $group_by_parts .= ', l.date';
+        break;
+      case 'user':
+        $group_by_parts .= ', u.name';
+        break;
+      case 'client':
+        $group_by_parts .= ', c.name';
+        break;
+      case 'project':
+        $group_by_parts .= ', p.name';
+        break;
+      case 'task':
+        $group_by_parts .= ', t.name';
+        break;
+      case 'cf_1':
+        $group_by_parts .= ', cfo.value';
+        break;
+    }
+    // Remove garbage from the beginning.
+    $group_by_parts = ltrim($group_by_parts, ', ');
+    $group_by_part = "group by $group_by_parts";
+    return $group_by_part;
+  }
+
+  // makeGroupByExpensesPart builds a combined group by part for sql query for expense items using
+  // group_by1, group_by2, and group_by3 values passed in $options.
+  static function makeGroupByExpensesPart($options) {
+    $no_grouping = ($options['group_by1'] == null || $options['group_by1'] == 'no_grouping') &&
+      ($options['group_by2'] == null || $options['group_by2'] == 'no_grouping') &&
+      ($options['group_by3'] == null || $options['group_by3'] == 'no_grouping');
+    if ($no_grouping) return null;
+
+    $group_by1 = $options['group_by1'];
+    $group_by2 = $options['group_by2'];
+    $group_by3 = $options['group_by3'];
+
+    switch ($group_by1) {
+      case 'date':
+        $group_by_parts .= ', ei.date';
+        break;
+      case 'user':
+        $group_by_parts .= ', u.name';
+        break;
+      case 'client':
+        $group_by_parts .= ', c.name';
+        break;
+      case 'project':
+        $group_by_parts .= ', p.name';
+        break;
+    }
+    switch ($group_by2) {
+      case 'date':
+        $group_by_parts .= ', ei.date';
+        break;
+      case 'user':
+        $group_by_parts .= ', u.name';
+        break;
+      case 'client':
+        $group_by_parts .= ', c.name';
+        break;
+      case 'project':
+        $group_by_parts .= ', p.name';
+        break;
+    }
+    switch ($group_by3) {
+      case 'date':
+        $group_by_parts .= ', ei.date';
+        break;
+      case 'user':
+        $group_by_parts .= ', u.name';
+        break;
+      case 'client':
+        $group_by_parts .= ', c.name';
+        break;
+      case 'project':
+        $group_by_parts .= ', p.name';
+        break;
+    }
+    // Remove garbage from the beginning.
+    $group_by_parts = ltrim($group_by_parts, ', ');
+    if ($group_by_parts)
+      $group_by_part = "group by $group_by_parts";
+    return $group_by_part;
+  }
+
+  // makeConcatPart builds a concatenation part for getSubtotals query (for time items).
+  static function makeConcatPart($options) {
+    $group_by1 = $options['group_by1'];
+    $group_by2 = $options['group_by2'];
+    $group_by3 = $options['group_by3'];
+
+    switch ($group_by1) {
+      case 'date':
+        $what_to_concat .= ", ' - ', l.date";
+        break;
+      case 'user':
+        $what_to_concat .= ", ' - ', u.name";
+        $fields_part .= ', u.name as user';
+        break;
+      case 'client':
+        $what_to_concat .= ", ' - ', coalesce(c.name, 'Null')";
+        $fields_part .= ', c.name as client';
+        break;
+      case 'project':
+        $what_to_concat .= ", ' - ', coalesce(p.name, 'Null')";
+        $fields_part .= ', p.name as project';
+        break;
+      case 'task':
+        $what_to_concat .= ", ' - ', coalesce(t.name, 'Null')";
+        $fields_part .= ', t.name as task';
+        break;
+      case 'cf_1':
+        $what_to_concat .= ", ' - ', coalesce(cfo.value, 'Null')";
+        $fields_part .= ', cfo.value as cf_1';
+        break;
+    }
+    switch ($group_by2) {
+      case 'date':
+        $what_to_concat .= ", ' - ', l.date";
+        break;
+      case 'user':
+        $what_to_concat .= ", ' - ', u.name";
+        $fields_part .= ', u.name as user';
+        break;
+      case 'client':
+        $what_to_concat .= ", ' - ', coalesce(c.name, 'Null')";
+        $fields_part .= ', c.name as client';
+        break;
+      case 'project':
+        $what_to_concat .= ", ' - ', coalesce(p.name, 'Null')";
+        $fields_part .= ', p.name as project';
+        break;
+      case 'task':
+        $what_to_concat .= ", ' - ', coalesce(t.name, 'Null')";
+        $fields_part .= ', t.name as task';
+        break;
+      case 'cf_1':
+        $what_to_concat .= ", ' - ', coalesce(cfo.value, 'Null')";
+        $fields_part .= ', cfo.value as cf_1';
+        break;
+    }
+    switch ($group_by3) {
+      case 'date':
+        $what_to_concat .= ", ' - ', l.date";
+        break;
+      case 'user':
+        $what_to_concat .= ", ' - ', u.name";
+        $fields_part .= ', u.name as user';
+        break;
+      case 'client':
+        $what_to_concat .= ", ' - ', coalesce(c.name, 'Null')";
+        $fields_part .= ', c.name as client';
+        break;
+      case 'project':
+        $what_to_concat .= ", ' - ', coalesce(p.name, 'Null')";
+        $fields_part .= ', p.name as project';
+        break;
+      case 'task':
+        $what_to_concat .= ", ' - ', coalesce(t.name, 'Null')";
+        $fields_part .= ', t.name as task';
+        break;
+      case 'cf_1':
+        $what_to_concat .= ", ' - ', coalesce(cfo.value, 'Null')";
+        $fields_part .= ', cfo.value as cf_1';
+        break;
+    }
+    // Remove garbage from both ends.
+    $what_to_concat = trim($what_to_concat, "', -");
+    $concat_part = "concat($what_to_concat) as group_field";
+    $concat_part = trim($concat_part, ' -');
+    return "$concat_part $fields_part";
+  }
+
+  // makeConcatPart builds a concatenation part for getSubtotals query (for expense items).
+  static function makeConcatExpensesPart($options) {
+    $group_by1 = $options['group_by1'];
+    $group_by2 = $options['group_by2'];
+    $group_by3 = $options['group_by3'];
+
+    switch ($group_by1) {
+      case 'date':
+        $what_to_concat .= ", ' - ', ei.date";
+        break;
+      case 'user':
+        $what_to_concat .= ", ' - ', u.name";
+        $fields_part .= ', u.name as user';
+        break;
+      case 'client':
+        $what_to_concat .= ", ' - ', coalesce(c.name, 'Null')";
+        $fields_part .= ', c.name as client';
+        break;
+      case 'project':
+        $what_to_concat .= ", ' - ', coalesce(p.name, 'Null')";
+        $fields_part .= ', p.name as project';
+        break;
+
+      case 'task':
+        $what_to_concat .= ", ' - ', 'Null'";
+        $fields_part .= ', null as task';
+        break;
+
+      case 'cf_1':
+        $what_to_concat .= ", ' - ', 'Null'";
+        $fields_part .= ', null as cf_1';
+        break;
+    }
+    switch ($group_by2) {
+      case 'date':
+        $what_to_concat .= ", ' - ', ei.date";
+        break;
+      case 'user':
+        $what_to_concat .= ", ' - ', u.name";
+        $fields_part .= ', u.name as user';
+        break;
+      case 'client':
+        $what_to_concat .= ", ' - ', coalesce(c.name, 'Null')";
+        $fields_part .= ', c.name as client';
+        break;
+      case 'project':
+        $what_to_concat .= ", ' - ', coalesce(p.name, 'Null')";
+        $fields_part .= ', p.name as project';
+        break;
+
+      case 'task':
+        $what_to_concat .= ", ' - ', 'Null'";
+        $fields_part .= ', null as task';
+        break;
+
+      case 'cf_1':
+        $what_to_concat .= ", ' - ', 'Null'";
+        $fields_part .= ', null as cf_1';
+        break;
+    }
+    switch ($group_by3) {
+      case 'date':
+        $what_to_concat .= ", ' - ', ei.date";
+        break;
+      case 'user':
+        $what_to_concat .= ", ' - ', u.name";
+        $fields_part .= ', u.name as user';
+        break;
+      case 'client':
+        $what_to_concat .= ", ' - ', coalesce(c.name, 'Null')";
+        $fields_part .= ', c.name as client';
+        break;
+      case 'project':
+        $what_to_concat .= ", ' - ', coalesce(p.name, 'Null')";
+        $fields_part .= ', p.name as project';
+        break;
+
+      case 'task':
+        $what_to_concat .= ", ' - ', 'Null'";
+        $fields_part .= ', null as task';
+        break;
+
+      case 'cf_1':
+        $what_to_concat .= ", ' - ', 'Null'";
+        $fields_part .= ', null as cf_1';
+        break;
+    }
+    // Remove garbage from the beginning.
+    if ($what_to_concat)
+        $what_to_concat = substr($what_to_concat, 8);
+    $concat_part = "concat($what_to_concat) as group_field";
+    return "$concat_part $fields_part";
+  }
+
+  // makeCombinedSelectPart builds a list of fields for a combined select on a union for getSubtotals.
+  // This is used when we include expenses.
+  static function makeCombinedSelectPart($options) {
+    $group_by1 = $options['group_by1'];
+    $group_by2 = $options['group_by2'];
+    $group_by3 = $options['group_by3'];
+
+    $fields = "group_field";
+
+    switch ($group_by1) {
+      case 'user':
+        $fields .= ', user';
+        break;
+      case 'client':
+        $fields_part .= ', client';
+        break;
+      case 'project':
+        $fields .= ', project';
+        break;
+
+      case 'task':
+        $fields .= ', task';
+        break;
+
+      case 'cf_1':
+        $fields .= ', cf_1';
+        break;
+    }
+    switch ($group_by2) {
+      case 'user':
+        $fields .= ', user';
+        break;
+      case 'client':
+        $fields_part .= ', client';
+        break;
+      case 'project':
+        $fields .= ', project';
+        break;
+
+      case 'task':
+        $fields .= ', task';
+        break;
+
+      case 'cf_1':
+        $fields .= ', cf_1';
+        break;
+    }
+    switch ($group_by3) {
+      case 'user':
+        $fields .= ', user';
+        break;
+      case 'client':
+        $fields_part .= ', client';
+        break;
+      case 'project':
+        $fields .= ', project';
+        break;
+
+      case 'task':
+        $fields .= ', task';
+        break;
+
+      case 'cf_1':
+        $fields .= ', cf_1';
+        break;
+    }
+    return $fields;
+  }
+
+  // makeJoinPart builds a left join part for getSubtotals query (for time items).
+  static function makeJoinPart($options) {
+    global $user;
+
+    $trackingMode = $user->getTrackingMode();
+    if (ttReportHelper::groupingBy('user', $options) || MODE_TIME == $trackingMode) {
+      $join .= ' left join tt_users u on (l.user_id = u.id)';
+    }
+    if (ttReportHelper::groupingBy('client', $options)) {
+      $join .= ' left join tt_clients c on (l.client_id = c.id)';
+    }
+    if (ttReportHelper::groupingBy('project', $options)) {
+      $join .= ' left join tt_projects p on (l.project_id = p.id)';
+    }
+    if (ttReportHelper::groupingBy('task', $options)) {
+      $join .= ' left join tt_tasks t on (l.task_id = t.id)';
+    }
+    if (ttReportHelper::groupingBy('cf_1', $options)) {
+      $custom_fields = new CustomFields();
+      if ($custom_fields->fields[0]['type'] == CustomFields::TYPE_TEXT)
+        $join .= ' left join tt_custom_field_log cfl on (l.id = cfl.log_id and cfl.status = 1) left join tt_custom_field_options cfo on (cfl.value = cfo.id)';
+      elseif ($custom_fields->fields[0]['type'] == CustomFields::TYPE_DROPDOWN)
+        $join .= ' left join tt_custom_field_log cfl on (l.id = cfl.log_id and cfl.status = 1) left join tt_custom_field_options cfo on (cfl.option_id = cfo.id)';
+    }
+    if ($options['show_cost'] && $trackingMode != MODE_TIME) {
+      $join .= ' left join tt_user_project_binds upb on (l.user_id = upb.user_id and l.project_id = upb.project_id)';
+    }
+    // Prepare inner joins.
+    $inner_joins = null;
+    if ($user->isPluginEnabled('ts') && $options['timesheet']) {
+      $timesheet_option = $options['timesheet'];
+      if ($timesheet_option == TIMESHEET_PENDING)
+        $inner_joins .= " inner join tt_timesheets ts on (l.timesheet_id = ts.id and ts.submit_status = 1 and ts.approve_status is null)";
+      else if ($timesheet_option == TIMESHEET_APPROVED)
+        $inner_joins .= " inner join tt_timesheets ts on (l.timesheet_id = ts.id and ts.approve_status = 1)";
+      else if ($timesheet_option == TIMESHEET_NOT_APPROVED)
+        $inner_joins .= " inner join tt_timesheets ts on (l.timesheet_id = ts.id and ts.approve_status = 0)";
+    }
+    $join .= $inner_joins;
+    return $join;
+  }
+
+  // makeWorkUnitPart builds an sql part for work units for time items.
+  static function makeWorkUnitPart($options) {
+    global $user;
+
+    $workUnits = $options['show_work_units'];
+    if ($workUnits) {
+      $unitTotalsOnly = $user->getConfigOption('unit_totals_only');
+      $firstUnitThreshold = $user->getConfigInt('1st_unit_threshold', 0);
+      $minutesInUnit = $user->getConfigInt('minutes_in_unit', 15);
+      if ($unitTotalsOnly)
+        $work_unit_part = ", if (sum(l.billable * time_to_sec(l.duration)/60) < $firstUnitThreshold, 0, ceil(sum(l.billable * time_to_sec(l.duration)/60/$minutesInUnit))) as units";
+      else
+        $work_unit_part = ", sum(if(l.billable = 0 or time_to_sec(l.duration)/60 < $firstUnitThreshold, 0, ceil(time_to_sec(l.duration)/60/$minutesInUnit))) as units";
+    }
+    return $work_unit_part;
+  }
+
+  // makeCostPart builds a cost part for time items.
+  static function makeCostPart($options) {
+    global $user;
+
+    if ($options['show_cost']) {
+      if (MODE_TIME == $user->getTrackingMode())
+        $cost_part = ", sum(cast(l.billable * coalesce(u.rate, 0) * time_to_sec(l.duration)/3600 as decimal(10, 2))) as cost";
+      else
+        $cost_part .= ", sum(cast(l.billable * coalesce(upb.rate, 0) * time_to_sec(l.duration)/3600 as decimal(10,2))) as cost";
+    }
+    return $cost_part;
+  }
+
+  // makeJoinExpensesPart builds a left join part for getSubtotals query for expense items.
+  static function makeJoinExpensesPart($options) {
+    global $user;
+
+    if (ttReportHelper::groupingBy('user', $options)) {
+      $join .= ' left join tt_users u on (ei.user_id = u.id)';
+    }
+    if (ttReportHelper::groupingBy('client', $options)) {
+      $join .= ' left join tt_clients c on (ei.client_id = c.id)';
+    }
+    if (ttReportHelper::groupingBy('project', $options)) {
+      $join .= ' left join tt_projects p on (ei.project_id = p.id)';
+    }
+    return $join;
+  }
+
+  // grouping determines if we are grouping the report by either group_by1,
+  // group_by2, or group_by3 values passed in $options.
+  static function grouping($options) {
+    $grouping = ($options['group_by1'] != null && $options['group_by1'] != 'no_grouping') ||
+      ($options['group_by2'] != null && $options['group_by2'] != 'no_grouping') ||
+      ($options['group_by3'] != null && $options['group_by3'] != 'no_grouping');
+    return $grouping;
+  }
+
+  // groupingBy determines if we are grouping a report by a value of $what
+  // ('date', 'user', 'project', etc.) by checking group_by1, group_by2,
+  // and group_by3 values passed in $options.
+  static function groupingBy($what, $options) {
+    $grouping = ($options['group_by1'] == $what) || ($options['group_by2'] == $what) || ($options['group_by3'] == $what);
+    return $grouping;
+  }
+
+  // makeGroupByHeader builds a column header for a totals-only report using group_by1,
+  // group_by2, and group_by3 values passed in $options.
+  static function makeGroupByHeader($options) {
+    global $i18n;
+    global $custom_fields;
+
+    $no_grouping = ($options['group_by1'] == null || $options['group_by1'] == 'no_grouping') &&
+      ($options['group_by2'] == null || $options['group_by2'] == 'no_grouping') &&
+      ($options['group_by3'] == null || $options['group_by3'] == 'no_grouping');
+    if ($no_grouping) return null;
+
+    if ($options['group_by1'] != null && $options['group_by1'] != 'no_grouping') {
+      // We have group_by1.
+      $group_by1 = $options['group_by1'];
+      if ('cf_1' == $group_by1)
+        $group_by_header .= ' - '.$custom_fields->fields[0]['label'];
+      else {
+        $key = 'label.'.$group_by1;
+        $group_by_header .= ' - '.$i18n->get($key);
+      }
+    }
+    if ($options['group_by2'] != null && $options['group_by2'] != 'no_grouping') {
+      // We have group_by2.
+      $group_by2 = $options['group_by2'];
+      if ('cf_1' == $group_by2)
+        $group_by_header .= ' - '.$custom_fields->fields[0]['label'];
+      else {
+        $key = 'label.'.$group_by2;
+        $group_by_header .= ' - '.$i18n->get($key);
+      }
+    }
+    if ($options['group_by3'] != null && $options['group_by3'] != 'no_grouping') {
+      // We have group_by3.
+      $group_by3 = $options['group_by3'];
+      if ('cf_1' == $group_by3)
+        $group_by_header .= ' - '.$custom_fields->fields[0]['label'];
+      else {
+        $key = 'label.'.$group_by3;
+        $group_by_header .= ' - '.$i18n->get($key);
+      }
+    }
+    $group_by_header = ltrim($group_by_header, ' -');
+    return $group_by_header;
+  }
+
+  // makeGroupByXmlTag creates an xml tag for a totals only report using group_by1,
+  // group_by2, and group_by3 values passed in $options.
+  static function makeGroupByXmlTag($options) {
+    if ($options['group_by1'] != null && $options['group_by1'] != 'no_grouping') {
+      // We have group_by1.
+      $tag .= '_'.$options['group_by1'];
+    }
+    if ($options['group_by2'] != null && $options['group_by2'] != 'no_grouping') {
+      // We have group_by2.
+      $tag .= '_'.$options['group_by2'];
+    }
+    if ($options['group_by3'] != null && $options['group_by3'] != 'no_grouping') {
+      // We have group_by3.
+      $tag .= '_'.$options['group_by3'];
+    }
+    $tag = ltrim($tag, '_');
+    return $tag;
+  }
+
+  // makeGroupByLabel builds a label for one row in a "Totals only" report of grouped by items.
+  // It does one thing: if we are grouping by date, the date format is converted for user.
+  static function makeGroupByLabel($key, $options) {
+    if (!ttReportHelper::groupingBy('date', $options))
+      return $key; // No need to format.
+
+    global $user;
+    if ($user->getDateFormat() == DB_DATEFORMAT)
+      return $key; // No need to format.
+
+    $label = $key;
+    if (preg_match('/\d\d\d\d-\d\d-\d\d/', $key, $matches)) {
+      // Replace the first found match of a date in DB_DATEFORMAT.
+      // This is not entirely clean but better than nothing for a label in a row.
+      $userDate = ttDateToUserFormat($matches[0]);
+      $label = str_replace($matches[0], $userDate, $key);
+    }
+    return $label;
   }
 }

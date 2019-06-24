@@ -53,10 +53,9 @@ class Auth_ldap extends Auth {
 
   function __construct($params)
   {
+    global $smarty;
     $this->params = $params;
-    if (isset($GLOBALS['smarty'])) {
-      $GLOBALS['smarty']->assign('Auth_ldap_params', $this->params);
-    }
+    $smarty->assign('Auth_ldap_params', $this->params);
   }
 
   function ldap_escape($str){
@@ -97,7 +96,7 @@ class Auth_ldap extends Auth {
 
     $lc = ldap_connect($this->params['server']);
 
-    if (defined('AUTH_DEBUG') && isTrue(AUTH_DEBUG)) {
+    if (isTrue('DEBUG')) {
       echo '<br />';
       echo '$lc='; var_dump($lc); echo '<br />';
       echo 'ldap_error()='; echo ldap_error($lc); echo '<br />';
@@ -107,7 +106,7 @@ class Auth_ldap extends Auth {
 
     ldap_set_option($lc, LDAP_OPT_PROTOCOL_VERSION, 3);
     ldap_set_option($lc, LDAP_OPT_REFERRALS, 0);
-    if (defined('AUTH_DEBUG') && isTrue(AUTH_DEBUG)) {
+    if (isTrue('DEBUG')) {
       ldap_set_option($lc, LDAP_OPT_DEBUG_LEVEL, 7);
     }
 
@@ -120,13 +119,13 @@ class Auth_ldap extends Auth {
         $login .= '@' . $this->params['default_domain'];
       }
 
-      if (defined('AUTH_DEBUG') && isTrue(AUTH_DEBUG)) {
+      if (isTrue('DEBUG')) {
         echo '$login='; var_dump($login); echo '<br />';
       }
 
       $lb = @ldap_bind($lc, $login, $password);
 
-      if (defined('AUTH_DEBUG') && isTrue(AUTH_DEBUG)) {
+      if (isTrue('DEBUG')) {
         echo '$lb='; var_dump($lb); echo '<br />';
         echo 'ldap_error()='; echo ldap_error($lc); echo '<br />';
       }
@@ -143,7 +142,7 @@ class Auth_ldap extends Auth {
         $fields = array('memberof');
         $sr = @ldap_search($lc, $this->params['base_dn'], $filter, $fields);
 
-        if (defined('AUTH_DEBUG') && isTrue(AUTH_DEBUG)) {
+        if (isTrue('DEBUG')) {
           echo '$sr='; var_dump($sr); echo '<br />';
           echo 'ldap_error()='; echo ldap_error($lc); echo '<br />';
         }
@@ -155,7 +154,7 @@ class Auth_ldap extends Auth {
 
         $entries = @ldap_get_entries($lc, $sr);
 
-        if (defined('AUTH_DEBUG') && isTrue(AUTH_DEBUG)) {
+        if (isTrue('DEBUG')) {
           echo '$entries='; var_dump($entries); echo '<br />';
           echo 'ldap_error()='; echo ldap_error($lc); echo '<br />';
         }
@@ -174,7 +173,7 @@ class Auth_ldap extends Auth {
           $groups[] = substr($grp_fields[0], 3);
         }
 
-        if (defined('AUTH_DEBUG') && isTrue(AUTH_DEBUG)) {
+        if (isTrue('DEBUG')) {
           echo '$member_of'; var_dump($member_of); echo '<br />';
         };
 
@@ -196,7 +195,7 @@ class Auth_ldap extends Auth {
       // Assuming OpenLDAP server.
       $login_oldap = 'uid='.$login.','.$this->params['base_dn'];
 
-      if (defined('AUTH_DEBUG') && isTrue(AUTH_DEBUG)) {
+      if (isTrue('DEBUG')) {
         echo '$login_oldap='; var_dump($login_oldap); echo '<br />';
       }
 
@@ -208,7 +207,7 @@ class Auth_ldap extends Auth {
 
       $lb = @ldap_bind($lc, $login_oldap, $password);
 
-      if (defined('AUTH_DEBUG') && isTrue(AUTH_DEBUG)) {
+      if (isTrue('DEBUG')) {
         echo '$lb='; var_dump($lb); echo '<br />';
         echo 'ldap_error()='; echo ldap_error($lc); echo '<br />';
       }
@@ -226,7 +225,7 @@ class Auth_ldap extends Auth {
         $fields = array('samaccountname', 'mail', 'memberof', 'department', 'displayname', 'telephonenumber', 'primarygroupid');
         $sr = @ldap_search($lc, $this->params['base_dn'], $filter, $fields);
 
-        if (defined('AUTH_DEBUG') && isTrue(AUTH_DEBUG)) {
+        if (isTrue('DEBUG')) {
           echo '$sr='; var_dump($sr); echo '<br />';
           echo 'ldap_error()='; echo ldap_error($lc); echo '<br />';
         }
@@ -239,7 +238,7 @@ class Auth_ldap extends Auth {
 
         $entries = @ldap_get_entries($lc, $sr);
 
-        if (defined('AUTH_DEBUG') && isTrue(AUTH_DEBUG)) {
+        if (isTrue('DEBUG')) {
           echo '$entries='; var_dump($entries); echo '<br />';
           echo 'ldap_error()='; echo ldap_error($lc); echo '<br />';
         }
@@ -259,7 +258,7 @@ class Auth_ldap extends Auth {
           $groups[] = substr($grp_fields[0], 3);
         }
 
-        if (defined('AUTH_DEBUG') && isTrue(AUTH_DEBUG)) {
+        if (isTrue('DEBUG')) {
           echo '$member_of'; var_dump($member_of); echo '<br />';
         }
 

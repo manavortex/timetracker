@@ -45,10 +45,14 @@ import('ttFavReportHelper');
 import('ttReportHelper');
 
 $mdb2 = getConnection();
-$now = mktime();
+$now = time();
 
-$sql = "select * from tt_cron where $now >= next 
-  and status = 1 and report_id is not null and email is not null";
+$sql = "select c.id, c.cron_spec, c.report_id, c.email, c.cc, c.subject, c.report_condition from tt_cron c".
+  " inner join tt_fav_reports fr on".
+  " (c.report_id = fr.id and c.group_id = fr.group_id and c.org_id = fr.org_id)". // Report for a correct group.
+  " inner join tt_users u on (u.id = fr.user_id and u.status = 1)". // Report for an active user.
+  " where $now >= c.next and fr.status = 1". // Due now.
+  " and c.status = 1 and c.report_id is not null and c.email is not null";
 $res = $mdb2->query($sql);
 if (is_a($res, 'PEAR_Error'))
   exit();
@@ -57,23 +61,48 @@ while ($val = $res->fetchRow()) {
   // We have jobs to execute in user language.
 
   // Get favorite report details.
-  $report = ttFavReportHelper::getReport($val['report_id']);
-  if (!$report) continue;
+  $options = ttFavReportHelper::getReportOptions($val['report_id']);
+  if (!$options) continue; // Skip not found report.
 
-  // Recycle global $user and $i18n objects, as user settings and language are specific for each report.
-  $user = new ttUser(null, $report['user_id']);
+  // Recycle global $user object, as user settings are specific for each report.
+  $user = new ttUser(null, $options['user_id']);
+  if (!$user->id) continue; // Skip not found user.
+
+  // Avoid complications with impersonated users, possibly from subgroups.
+  // Note: this may happen when cron.php is called by a browser who already impersonates.
+  // This is not supposed to happen in automatic cron job.
+  if ($user->behalf_id)
+    continue; // Skip processing on behalf situations entirely.
+
+  // TODO: write a new function ttFavReportHelper::adjustOptions that will use
+  // a $user object recycled above. Put user handling below into it.
+  // Also adjust remaining options for potentially changed user access rights and group properties.
+  // For example, tracking mode may have changed, but fav report options are still old...
+  // This needs to be fixed.
+  $options = ttFavReportHelper::adjustOptions($options);
+
+  // Skip users with disabled Notifications plugin.
+  if (!$user->isPluginEnabled('no')) continue;
+
+  // Recycle $i18n object because language is user-specific.
   $i18n->load($user->lang);
 
-  // Email report.
-  if (ttReportHelper::sendFavReport($report, $val['email']))
-    echo "Report ".$val['report_id']. " sent to ".$val['email']."<br>";
-  else
-    echo "Error while emailing report...<br>";
+  // Check condition on a report.
+  $condition_ok = true;
+  if ($val['report_condition'])
+    $condition_ok = ttReportHelper::checkFavReportCondition($options, $val['report_condition']);
+
+  // Email report if condition is okay.
+  if ($condition_ok) {
+    if (ttReportHelper::sendFavReport($options, $val['subject'], $val['email'], $val['cc']))
+      echo "Report ".$val['report_id']. " sent.<br>";
+    else
+      echo "Error while emailing report...<br>";
+  }
 
   // Calculate next execution time.
   $next = tdCron::getNextOccurrence($val['cron_spec'], $now + 60); // +60 sec is here to get us correct $next when $now is close to existing "next".
                                                                    // This is because the accuracy of tdcron class appears to be 1 minute.
-
   // Update last and next values in tt_cron.
   $sql = "update tt_cron set last = $now, next = $next where id = ".$val['id'];
   $affected = $mdb2->exec($sql);

@@ -26,6 +26,26 @@ projects = new Array();
 // Mandatory top option for project dropdown.
 empty_label_project = '{$i18n.dropdown.select|escape:'javascript'}';
 
+// Prepare an array of predefined expenses.
+idx = 0;
+var defined_expenses = new Array();
+{foreach $predefined_expenses as $predefined_expense}
+  defined_expenses[idx] = new Array("{$predefined_expense.id}", "{$predefined_expense.name|escape:'javascript'}", "{$predefined_expense.cost}");
+  idx++;
+{/foreach}
+
+{* Conditional include of confirmSave handler. *}
+{if $confirm_save}
+var original_date = "{$entry_date}";
+
+function confirmSave() {
+  var date_on_save = document.getElementById("date").value;
+  if (original_date != date_on_save) {
+    return confirm("{$i18n.warn.confirm_save}");
+  }
+}
+{/if}
+
 // The fillProjectDropdown function populates the project combo box with
 // projects associated with a selected client (client id is passed here as id).
 function fillProjectDropdown(id) {
@@ -66,6 +86,42 @@ function get_date() {
   var date = new Date();
   return date.strftime("%Y-%m-%d");
 }
+
+// The recalculateCost function recalculates cost based on the current selection
+// of predefined expense and quantity and also changes the comment accordingly.
+function recalculateCost() {
+  var quantity_control = document.getElementById("quantity");
+  // Set quantity to 1 if it is not set already.
+  if (!quantity_control.value) {
+     quantity_control.value = "1";
+  }
+
+  var comment_control = document.getElementById("item_name");
+  var cost_control = document.getElementById("cost");
+  var replaceDecimalMark = ("." != "{$user->getDecimalMark()}");
+
+  // Calculate cost.
+  var dropdown = document.getElementById("predefined_expense");
+  if (dropdown.selectedIndex == 0) {
+    quantity_control.value = "";
+    comment_control.value = "";
+    cost_control.value = "";
+  } else {
+    comment_control.value = defined_expenses[dropdown.selectedIndex - 1][1] + " - " + quantity_control.value;
+    var quantity = quantity_control.value;
+    if (isNaN(quantity))
+      cost_control.value = "";
+    else {
+      var expenseCost = defined_expenses[dropdown.selectedIndex - 1][2];
+      if (replaceDecimalMark)
+        expenseCost = expenseCost.replace("{$user->getDecimalMark()}", ".");
+      var newCost = (quantity_control.value * expenseCost).toFixed(2);
+      if (replaceDecimalMark)
+        newCost = newCost.replace(".", "{$user->getDecimalMark()}");
+      cost_control.value = newCost;
+    }
+  }
+}
 </script>
 
 {$forms.expenseItemForm.open}
@@ -78,14 +134,24 @@ function get_date() {
     <table border="0">
 {if $user->isPluginEnabled('cl')}
     <tr>
-      <td align="right">{$i18n.label.client} {if $user->isPluginEnabled('cm')}(*){/if}:</td>
+      <td align="right">{$i18n.label.client} {if $user->isOptionEnabled('client_required')}(*){/if}:</td>
       <td>{$forms.expenseItemForm.client.control}</td>
     </tr>
 {/if}
-{if ($smarty.const.MODE_PROJECTS == $user->tracking_mode || $smarty.const.MODE_PROJECTS_AND_TASKS == $user->tracking_mode)}
+{if $show_project}
     <tr>
       <td align="right">{$i18n.label.project} (*):</td>
       <td>{$forms.expenseItemForm.project.control}</td>
+    </tr>
+{/if}
+{if $predefined_expenses}
+    <tr>
+      <td align="right">{$i18n.label.expense}:</td>
+      <td>{$forms.expenseItemForm.predefined_expense.control}</td>
+    </tr>
+    <tr>
+      <td align="right">{$i18n.label.quantity}:</td>
+      <td>{$forms.expenseItemForm.quantity.control}</td>
     </tr>
 {/if}
     <tr>
@@ -94,7 +160,7 @@ function get_date() {
     </tr>
     <tr>
       <td align="right">{$i18n.label.cost}:</td>
-      <td>{$forms.expenseItemForm.cost.control} {$user->currency|escape}</td>
+      <td>{$forms.expenseItemForm.cost.control} {$user->getCurrency()|escape}</td>
     </tr>
     <tr>
       <td align="right">{$i18n.label.date}:</td>

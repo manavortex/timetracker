@@ -30,13 +30,23 @@ require_once('initialize.php');
 require_once('plugins/CustomFields.class.php');
 import('form.Form');
 
-// Access check.
-if (!ttAccessCheck(right_manage_team) || !$user->isPluginEnabled('cf')) {
+// Access checks.
+if (!ttAccessAllowed('manage_custom_fields')) {
   header('Location: access_denied.php');
   exit();
 }
-
+if (!$user->isPluginEnabled('cf')) {
+  header('Location: feature_disabled.php');
+  exit();
+}
 $cl_id = $request->getParameter('id');
+$option = CustomFields::getOptionName($cl_id);
+if (!$option) {
+  header('Location: access_denied.php');
+  exit();
+}
+// End of access checks.
+
 $form = new Form('optionDeleteForm');
 
 if ($request->isPost()) {
@@ -50,7 +60,7 @@ if ($request->isPost()) {
       header("Location: cf_dropdown_options.php?field_id=$field_id");
       exit();
     } else
-      $err->add($i18n->getKey('error.db'));
+      $err->add($i18n->get('error.db'));
   }
   if ($request->getParameter('btn_cancel')) {
     // Cancel button pressed.
@@ -58,20 +68,14 @@ if ($request->isPost()) {
     exit();
   }
 } else {
-  $option = CustomFields::getOptionName($cl_id);
-  if (false === $option)
-    $err->add($i18n->getKey('error.db'));
-
-  if ($err->no()) {
-    $form->addInput(array('type'=>'hidden','name'=>'id','value'=>$cl_id));
-    $form->addInput(array('type'=>'submit','name'=>'btn_delete','value'=>$i18n->getKey('label.delete')));
-    $form->addInput(array('type'=>'submit','name'=>'btn_cancel','value'=>$i18n->getKey('button.cancel')));
-  }
+  $form->addInput(array('type'=>'hidden','name'=>'id','value'=>$cl_id));
+  $form->addInput(array('type'=>'submit','name'=>'btn_delete','value'=>$i18n->get('label.delete')));
+  $form->addInput(array('type'=>'submit','name'=>'btn_cancel','value'=>$i18n->get('button.cancel')));
 }
 
 $smarty->assign('option', $option);
 $smarty->assign('forms', array($form->getName()=>$form->toArray()));
 $smarty->assign('onload', 'onLoad="document.optionDeleteForm.btn_cancel.focus()"');
-$smarty->assign('title', $i18n->getKey('title.cf_delete_dropdown_option'));
+$smarty->assign('title', $i18n->get('title.cf_delete_dropdown_option'));
 $smarty->assign('content_page_name', 'cf_dropdown_option_delete.tpl');
 $smarty->display('index.tpl');

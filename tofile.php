@@ -31,16 +31,17 @@ import('form.Form');
 import('form.ActionForm');
 import('ttReportHelper');
 
-// Access check.
-if (!ttAccessCheck(right_view_reports)) {
+// Access checks.
+if (!(ttAccessAllowed('view_own_reports') || ttAccessAllowed('view_reports') || ttAccessAllowed('view_all_reports')  || ttAccessAllowed('view_client_reports'))) {
   header('Location: access_denied.php');
   exit();
 }
+// End of access checks.
 
 // Use custom fields plugin if it is enabled.
 if ($user->isPluginEnabled('cf')) {
   require_once('plugins/CustomFields.class.php');
-  $custom_fields = new CustomFields($user->team_id);
+  $custom_fields = new CustomFields();
 }
 
 // Report settings are stored in session bean before we get here.
@@ -53,17 +54,18 @@ $bean = new ActionForm('reportBean', new Form('reportForm'), $request);
 $type = $request->getParameter('type');
 
 // Also, there are 2 variations of report: totals only, or normal. Totals only means that the report
-// is grouped by (either date, user, client, project, task or cf_1) and user only needs to see subtotals by group.
+// is grouped by (either date, user, client, project, task, or cf_1) and user only needs to see subtotals by group.
 $totals_only = $bean->getAttribute('chtotalsonly');
 
 // Obtain items.
+$options = ttReportHelper::getReportOptions($bean);
 if ($totals_only)
-  $subtotals = ttReportHelper::getSubtotals($bean);
+  $subtotals = ttReportHelper::getSubtotals($options);
 else
-  $items = ttReportHelper::getItems($bean);
+  $items = ttReportHelper::getItems($options);
 
 // Build a string to use as filename for the files being downloaded.
-$filename = strtolower($i18n->getKey('title.report')).'_'.$bean->mValues['start_date'].'_'.$bean->mValues['end_date'];
+$filename = strtolower($i18n->get('title.report')).'_'.$bean->mValues['start_date'].'_'.$bean->mValues['end_date'];
 
 header('Pragma: public'); // This is needed for IE8 to download files over https.
 header('Content-Type: text/html; charset=utf-8');
@@ -82,21 +84,26 @@ if ('xml' == $type) {
   print "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
   print "<rows>\n";
 
-  $group_by = $bean->getAttribute('group_by');
   if ($totals_only) {
-    // Totals only report. Print subtotals.
+    // Totals only report.
+    $group_by_tag = ttReportHelper::makeGroupByXmlTag($options);
+
+    // Print subtotals.
     foreach ($subtotals as $subtotal) {
       print "<row>\n";
-      print "\t<".$group_by."><![CDATA[".$subtotal['name']."]]></".$group_by.">\n";
+      print "\t<".$group_by_tag."><![CDATA[".$subtotal['name']."]]></".$group_by_tag.">\n";
       if ($bean->getAttribute('chduration')) {
         $val = $subtotal['time'];
-        if($val && defined('EXPORT_DECIMAL_DURATION') && isTrue(EXPORT_DECIMAL_DURATION))
+        if($val && isTrue('EXPORT_DECIMAL_DURATION'))
           $val = time_to_decimal($val);
         print "\t<duration><![CDATA[".$val."]]></duration>\n";
       }
+      if ($bean->getAttribute('chunits')) {
+        print "\t<units><![CDATA[".$subtotal['units']."]]></units>\n";
+      }
       if ($bean->getAttribute('chcost')) {
         print "\t<cost><![CDATA[";
-        if ($user->canManageTeam() || $user->isClient())
+        if ($user->can('manage_invoices') || $user->isClient())
           print $subtotal['cost'];
         else
           print $subtotal['expenses'];
@@ -110,7 +117,7 @@ if ('xml' == $type) {
       print "<row>\n";
 
       print "\t<date><![CDATA[".$item['date']."]]></date>\n";
-      if ($user->canManageTeam() || $user->isClient()) print "\t<user><![CDATA[".$item['user']."]]></user>\n"; 
+      if ($user->can('view_reports') || $user->can('view_all_reports') || $user->isClient()) print "\t<user><![CDATA[".$item['user']."]]></user>\n"; 
       if ($bean->getAttribute('chclient')) print "\t<client><![CDATA[".$item['client']."]]></client>\n";
       if ($bean->getAttribute('chproject')) print "\t<project><![CDATA[".$item['project']."]]></project>\n";
       if ($bean->getAttribute('chtask')) print "\t<task><![CDATA[".$item['task']."]]></task>\n";
@@ -119,20 +126,28 @@ if ('xml' == $type) {
       if ($bean->getAttribute('chfinish')) print "\t<finish><![CDATA[".$item['finish']."]]></finish>\n";
       if ($bean->getAttribute('chduration')) {
         $duration = $item['duration'];
-        if($duration && defined('EXPORT_DECIMAL_DURATION') && isTrue(EXPORT_DECIMAL_DURATION))
+        if($duration && isTrue('EXPORT_DECIMAL_DURATION'))
           $duration = time_to_decimal($duration);
           print "\t<duration><![CDATA[".$duration."]]></duration>\n";
       }
+      if ($bean->getAttribute('chunits')) print "\t<units><![CDATA[".$item['units']."]]></units>\n";
       if ($bean->getAttribute('chnote')) print "\t<note><![CDATA[".$item['note']."]]></note>\n";
       if ($bean->getAttribute('chcost')) {
         print "\t<cost><![CDATA[";
-        if ($user->canManageTeam() || $user->isClient())
+        if ($user->can('manage_invoices') || $user->isClient())
           print $item['cost'];
         else
           print $item['expense'];
         print "]]></cost>\n";
       }
+      if ($bean->getAttribute('chapproved')) print "\t<approved><![CDATA[".$item['approved']."]]></approved>\n";
+      if ($bean->getAttribute('chpaid')) print "\t<paid><![CDATA[".$item['paid']."]]></paid>\n";
+      if ($bean->getAttribute('chip')) {
+        $ip = $item['modified'] ? $item['modified_ip'].' '.$item['modified'] : $item['created_ip'].' '.$item['created'];
+        print "\t<ip><![CDATA[".$ip."]]></ip>\n";
+      }
       if ($bean->getAttribute('chinvoice')) print "\t<invoice><![CDATA[".$item['invoice']."]]></invoice>\n";
+      if ($bean->getAttribute('chtimesheet')) print "\t<timesheet><![CDATA[".$item['timesheet_name']."]]></timesheet>\n";
 
       print "</row>\n";
     }
@@ -150,22 +165,15 @@ if ('csv' == $type) {
   $bom = chr(239).chr(187).chr(191); // 0xEF 0xBB 0xBF in the beginning of the file is UTF8 BOM.
   print $bom; // Without this Excel does not display UTF8 characters properly.
 
-  $group_by = $bean->getAttribute('group_by');
   if ($totals_only) {
     // Totals only report.
-
-    // Determine group_by header.
-    if ('cf_1' == $group_by)
-      $group_by_header = $custom_fields->fields[0]['label'];
-    else {
-      $key = 'label.'.$group_by;
-      $group_by_header = $i18n->getKey($key);
-    }
+    $group_by_header = ttReportHelper::makeGroupByHeader($options);
 
     // Print headers.
     print '"'.$group_by_header.'"';
-    if ($bean->getAttribute('chduration')) print ',"'.$i18n->getKey('label.duration').'"';
-    if ($bean->getAttribute('chcost')) print ',"'.$i18n->getKey('label.cost').'"';
+    if ($bean->getAttribute('chduration')) print ',"'.$i18n->get('label.duration').'"';
+    if ($bean->getAttribute('chunits')) print ',"'.$i18n->get('label.work_units_short').'"';
+    if ($bean->getAttribute('chcost')) print ',"'.$i18n->get('label.cost').'"';
     print "\n";
 
     // Print subtotals.
@@ -173,12 +181,13 @@ if ('csv' == $type) {
       print '"'.$subtotal['name'].'"';
       if ($bean->getAttribute('chduration')) {
         $val = $subtotal['time'];
-        if($val && defined('EXPORT_DECIMAL_DURATION') && isTrue(EXPORT_DECIMAL_DURATION))
+        if($val && isTrue('EXPORT_DECIMAL_DURATION'))
           $val = time_to_decimal($val);
         print ',"'.$val.'"';
       }
+      if ($bean->getAttribute('chunits')) print ',"'.$subtotal['units'].'"';
       if ($bean->getAttribute('chcost')) {
-        if ($user->canManageTeam() || $user->isClient())
+        if ($user->can('manage_invoices') || $user->isClient())
           print ',"'.$subtotal['cost'].'"';
         else
           print ',"'.$subtotal['expenses'].'"';
@@ -187,24 +196,29 @@ if ('csv' == $type) {
     }
   } else {
     // Normal report. Print headers.
-    print '"'.$i18n->getKey('label.date').'"';
-    if ($user->canManageTeam() || $user->isClient()) print ',"'.$i18n->getKey('label.user').'"';
-    if ($bean->getAttribute('chclient')) print ',"'.$i18n->getKey('label.client').'"';
-    if ($bean->getAttribute('chproject')) print ',"'.$i18n->getKey('label.project').'"';
-    if ($bean->getAttribute('chtask')) print ',"'.$i18n->getKey('label.task').'"';
+    print '"'.$i18n->get('label.date').'"';
+    if ($user->can('view_reports') || $user->can('view_all_reports') || $user->isClient()) print ',"'.$i18n->get('label.user').'"';
+    if ($bean->getAttribute('chclient')) print ',"'.$i18n->get('label.client').'"';
+    if ($bean->getAttribute('chproject')) print ',"'.$i18n->get('label.project').'"';
+    if ($bean->getAttribute('chtask')) print ',"'.$i18n->get('label.task').'"';
     if ($bean->getAttribute('chcf_1')) print ',"'.$custom_fields->fields[0]['label'].'"';
-    if ($bean->getAttribute('chstart')) print ',"'.$i18n->getKey('label.start').'"';
-    if ($bean->getAttribute('chfinish')) print ',"'.$i18n->getKey('label.finish').'"';
-    if ($bean->getAttribute('chduration')) print ',"'.$i18n->getKey('label.duration').'"';
-    if ($bean->getAttribute('chnote')) print ',"'.$i18n->getKey('label.note').'"';
-    if ($bean->getAttribute('chcost')) print ',"'.$i18n->getKey('label.cost').'"';
-    if ($bean->getAttribute('chinvoice')) print ',"'.$i18n->getKey('label.invoice').'"';
+    if ($bean->getAttribute('chstart')) print ',"'.$i18n->get('label.start').'"';
+    if ($bean->getAttribute('chfinish')) print ',"'.$i18n->get('label.finish').'"';
+    if ($bean->getAttribute('chduration')) print ',"'.$i18n->get('label.duration').'"';
+    if ($bean->getAttribute('chunits')) print ',"'.$i18n->get('label.work_units_short').'"';
+    if ($bean->getAttribute('chnote')) print ',"'.$i18n->get('label.note').'"';
+    if ($bean->getAttribute('chcost')) print ',"'.$i18n->get('label.cost').'"';
+    if ($bean->getAttribute('chapproved')) print ',"'.$i18n->get('label.approved').'"';
+    if ($bean->getAttribute('chpaid')) print ',"'.$i18n->get('label.paid').'"';
+    if ($bean->getAttribute('chip')) print ',"'.$i18n->get('label.ip').'"';
+    if ($bean->getAttribute('chinvoice')) print ',"'.$i18n->get('label.invoice').'"';
+    if ($bean->getAttribute('chtimesheet')) print ',"'.$i18n->get('label.timesheet').'"';
     print "\n";
 
     // Print items.
     foreach ($items as $item) {
       print '"'.$item['date'].'"';
-      if ($user->canManageTeam() || $user->isClient()) print ',"'.str_replace('"','""',$item['user']).'"';
+      if ($user->can('view_reports') || $user->can('view_all_reports') || $user->isClient()) print ',"'.str_replace('"','""',$item['user']).'"';
       if ($bean->getAttribute('chclient')) print ',"'.str_replace('"','""',$item['client']).'"';
       if ($bean->getAttribute('chproject')) print ',"'.str_replace('"','""',$item['project']).'"';
       if ($bean->getAttribute('chtask')) print ',"'.str_replace('"','""',$item['task']).'"';
@@ -213,18 +227,26 @@ if ('csv' == $type) {
       if ($bean->getAttribute('chfinish')) print ',"'.$item['finish'].'"';
       if ($bean->getAttribute('chduration')) {
         $val = $item['duration'];
-        if($val && defined('EXPORT_DECIMAL_DURATION') && isTrue(EXPORT_DECIMAL_DURATION))
+        if($val && isTrue('EXPORT_DECIMAL_DURATION'))
           $val = time_to_decimal($val);
         print ',"'.$val.'"';
       }
+      if ($bean->getAttribute('chunits')) print ',"'.$item['units'].'"';
       if ($bean->getAttribute('chnote')) print ',"'.str_replace('"','""',$item['note']).'"';
       if ($bean->getAttribute('chcost')) {
-        if ($user->canManageTeam() || $user->isClient())
+        if ($user->can('manage_invoices') || $user->isClient())
           print ',"'.$item['cost'].'"';
         else
           print ',"'.$item['expense'].'"';
       }
+      if ($bean->getAttribute('chapproved')) print ',"'.$item['approved'].'"';
+      if ($bean->getAttribute('chpaid')) print ',"'.$item['paid'].'"';
+      if ($bean->getAttribute('chip')) {
+        $ip = $item['modified'] ? $item['modified_ip'].' '.$item['modified'] : $item['created_ip'].' '.$item['created'];
+        print ',"'.$ip.'"';
+      }
       if ($bean->getAttribute('chinvoice')) print ',"'.str_replace('"','""',$item['invoice']).'"';
+      if ($bean->getAttribute('chtimesheet')) print ',"'.str_replace('"','""',$item['timesheet_name']).'"';
       print "\n";
     }
   }

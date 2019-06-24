@@ -29,15 +29,19 @@
 require_once('../initialize.php');
 import('form.Form');
 import('ttClientHelper');
-import('ttTeamHelper');
+import('ttGroupHelper');
 
-// Access check.
-if (!ttAccessCheck(right_manage_team) || !$user->isPluginEnabled('cl')) {
+// Access checks.
+if (!ttAccessAllowed('manage_clients')) {
   header('Location: access_denied.php');
   exit();
 }
+if (!$user->isPluginEnabled('cl')) {
+  header('Location: feature_disabled.php');
+  exit();
+}
 
-$projects = ttTeamHelper::getActiveProjects($user->team_id);
+$projects = ttGroupHelper::getActiveProjects();
 
 if ($request->isPost()) {
   $cl_name = trim($request->getParameter('name'));
@@ -50,25 +54,25 @@ if ($request->isPost()) {
   //   $cl_projects[] = $project_item['id'];
 }
 
+$show_projects = (MODE_PROJECTS == $user->getTrackingMode() || MODE_PROJECTS_AND_TASKS == $user->getTrackingMode()) && count($projects) > 0;
+
 $form = new Form('clientForm');
 $form->addInput(array('type'=>'text','maxlength'=>'100','name'=>'name','value'=>$cl_name));
 $form->addInput(array('type'=>'textarea','name'=>'address','maxlength'=>'255','class'=>'mobile-textarea','value'=>$cl_address));
 $form->addInput(array('type'=>'floatfield','name'=>'tax','size'=>'10','format'=>'.2','value'=>$cl_tax));
-if (MODE_PROJECTS == $user->tracking_mode || MODE_PROJECTS_AND_TASKS == $user->tracking_mode)
+if ($show_projects)
   $form->addInput(array('type'=>'checkboxgroup','name'=>'projects','data'=>$projects,'layout'=>'H','datakeys'=>array('id','name'),'value'=>$cl_projects));
-$form->addInput(array('type'=>'submit','name'=>'btn_submit','value'=>$i18n->getKey('button.add')));
+$form->addInput(array('type'=>'submit','name'=>'btn_submit','value'=>$i18n->get('button.add')));
 
 if ($request->isPost()) {
   // Validate user input.
-  if (!ttValidString($cl_name)) $err->add($i18n->getKey('error.field'), $i18n->getKey('label.client_name'));
-  if (!ttValidString($cl_address, true)) $err->add($i18n->getKey('error.field'), $i18n->getKey('label.client_address'));
-  if (!ttValidFloat($cl_tax, true)) $err->add($i18n->getKey('error.field'), $i18n->getKey('label.tax'));
+  if (!ttValidString($cl_name)) $err->add($i18n->get('error.field'), $i18n->get('label.client_name'));
+  if (!ttValidString($cl_address, true)) $err->add($i18n->get('error.field'), $i18n->get('label.client_address'));
+  if (!ttValidFloat($cl_tax, true)) $err->add($i18n->get('error.field'), $i18n->get('label.tax'));
 
   if ($err->no()) {
     if (!ttClientHelper::getClientByName($cl_name)) {
-      if (ttClientHelper::insert(array(
-        'team_id' => $user->team_id,
-        'name' => $cl_name,
+      if (ttClientHelper::insert(array('name' => $cl_name,
         'address' => $cl_address,
         'tax' => $cl_tax,
         'projects' => $cl_projects,
@@ -76,14 +80,15 @@ if ($request->isPost()) {
         header('Location: clients.php');
         exit();
       } else
-        $err->add($i18n->getKey('error.db'));
+        $err->add($i18n->get('error.db'));
      } else
-       $err->add($i18n->getKey('error.client_exists'));
+       $err->add($i18n->get('error.object_exists'));
   }
 } // isPost
 
 $smarty->assign('forms', array($form->getName()=>$form->toArray()));
 $smarty->assign('onload', 'onLoad="document.clientForm.name.focus()"');
-$smarty->assign('title', $i18n->getKey('title.add_client'));
+$smarty->assign('show_projects',$show_projects);
+$smarty->assign('title', $i18n->get('title.add_client'));
 $smarty->assign('content_page_name', 'mobile/client_add.tpl');
 $smarty->display('mobile/index.tpl');

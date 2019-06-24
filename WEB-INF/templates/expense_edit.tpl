@@ -34,6 +34,18 @@ var defined_expenses = new Array();
   idx++;
 {/foreach}
 
+{* Conditional include of confirmSave handler. *}
+{if $confirm_save}
+var original_date = "{$entry_date}";
+
+function confirmSave() {
+  var date_on_save = document.getElementById("date").value;
+  if (original_date != date_on_save) {
+    return confirm("{$i18n.warn.confirm_save}");
+  }
+}
+{/if}
+
 // The fillProjectDropdown function populates the project combo box with
 // projects associated with a selected client (client id is passed here as id).
 function fillProjectDropdown(id) {
@@ -86,6 +98,7 @@ function recalculateCost() {
 
   var comment_control = document.getElementById("item_name");
   var cost_control = document.getElementById("cost");
+  var replaceDecimalMark = ("." != "{$user->getDecimalMark()}");
 
   // Calculate cost.
   var dropdown = document.getElementById("predefined_expense");
@@ -98,8 +111,15 @@ function recalculateCost() {
     var quantity = quantity_control.value;
     if (isNaN(quantity))
       cost_control.value = "";
-    else
-      cost_control.value = (quantity_control.value * defined_expenses[dropdown.selectedIndex - 1][2]).toFixed(2);
+    else {
+      var expenseCost = defined_expenses[dropdown.selectedIndex - 1][2];
+      if (replaceDecimalMark)
+        expenseCost = expenseCost.replace("{$user->getDecimalMark()}", ".");
+      var newCost = (quantity_control.value * expenseCost).toFixed(2);
+      if (replaceDecimalMark)
+        newCost = newCost.replace(".", "{$user->getDecimalMark()}");
+      cost_control.value = newCost;
+    }
   }
 }
 </script>
@@ -114,11 +134,11 @@ function recalculateCost() {
     <table border="0">
 {if $user->isPluginEnabled('cl')}
     <tr>
-      <td align="right">{$i18n.label.client} {if $user->isPluginEnabled('cm')}(*){/if}:</td>
+      <td align="right">{$i18n.label.client} {if $user->isOptionEnabled('client_required')}(*){/if}:</td>
       <td>{$forms.expenseItemForm.client.control}</td>
     </tr>
 {/if}
-{if ($smarty.const.MODE_PROJECTS == $user->tracking_mode || $smarty.const.MODE_PROJECTS_AND_TASKS == $user->tracking_mode)}
+{if $show_project}
     <tr>
       <td align="right">{$i18n.label.project} (*):</td>
       <td>{$forms.expenseItemForm.project.control}</td>
@@ -140,8 +160,14 @@ function recalculateCost() {
     </tr>
     <tr>
       <td align="right">{$i18n.label.cost}:</td>
-      <td>{$forms.expenseItemForm.cost.control} {$user->currency|escape}</td>
+      <td>{$forms.expenseItemForm.cost.control} {$user->getCurrency()|escape}</td>
     </tr>
+{if ($user->can('manage_invoices') && $user->isPluginEnabled('ps'))}
+    <tr>
+      <td align="right">&nbsp;</td>
+      <td><label>{$forms.expenseItemForm.paid.control}{$i18n.label.paid}</label></td>
+    </tr>
+{/if}
     <tr>
       <td align="right">{$i18n.label.date}:</td>
       <td>{$forms.expenseItemForm.date.control}</td>

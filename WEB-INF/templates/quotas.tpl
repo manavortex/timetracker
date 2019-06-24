@@ -11,7 +11,6 @@
           <tr>
             <td>{$i18n.form.quota.workday_hours}:</td>
             <td>{$forms.monthlyQuotasForm.workdayHours.control}</td>
-            <td><input type="submit" name="btn_hours" value="{$i18n.button.save}"></td>
           </tr>
         </table>
       </td>
@@ -29,7 +28,7 @@
       <table>
         <tr>
           <td class="tableHeaderCentered">{$i18n.form.quota.month}</td>
-          <td class="tableHeaderCentered">{$i18n.form.quota.quota}</td>
+          <td class="tableHeaderCentered">{$i18n.label.quota}</td>
         </tr>
 {foreach $months as $month}
         <tr>

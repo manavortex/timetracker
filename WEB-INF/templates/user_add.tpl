@@ -1,4 +1,13 @@
 <script>
+// Prepare an array of available roles. We need it for "is_client" property.
+// It is used to selectively display client selector for client roles.
+roles = new Array();
+var idx = 0;
+{foreach $active_roles as $active_role}
+roles[idx] = new Array({$active_role.id}, '{$active_role.is_client}');
+idx++;
+{/foreach}
+
 // The setDefaultRate function sets / unsets default rate for a project
 // when a corresponding checkbox is ticked.
 function setDefaultRate(element) {
@@ -20,14 +29,38 @@ function setDefaultRate(element) {
   }
 }
 
-// handleClientControl - controls visibility of the client dropdown depending on the selected user role.
-// We need to show it only when the "Client" user role is selected.
+// handleClientControl - controls visibility of the client dropdown depending on the selected user role,
+// also hides and unselects projects when "Client" user role is selected.
 function handleClientControl() {
+  var selectedRoleId = document.getElementById("role").value;
   var clientControl = document.getElementById("client");
-  if ("16" == document.getElementById("role").value)
-    clientControl.style.visibility = "visible";
-  else
-    clientControl.style.visibility = "hidden";
+  var nonClientBlock = document.getElementById("non_client_block");
+  var projectsControl = document.getElementById("projects_control");
+
+  var len = roles.length;
+  for (var i = 0; i < len; i++) {
+    if (selectedRoleId == roles[i][0]) {
+      var isClient = roles[i][1];
+      if (isClient == 1) {
+        clientControl.style.visibility = "visible";
+        nonClientBlock.style.display = "none";
+        projectsControl.style.display = "none";
+
+        // Uncheck all project checkboxes.
+        var checkboxes = document.getElementsByName("projects[]");
+        var j;
+        for (j = 0; j < checkboxes.length; j++) {
+          checkboxes[j].checked = false;
+        }
+      } else {
+        clientControl.value = "";
+        clientControl.style.visibility = "hidden";
+        nonClientBlock.style.display = "";
+        projectsControl.style.display = "";
+      }
+      break;
+    }
+  }
 }
 </script>
 
@@ -56,25 +89,34 @@ function handleClientControl() {
       <td align="right" nowrap>{$i18n.label.email}:</td>
       <td>{$forms.userForm.email.control}</td>
     </tr>
-{if $user->isManager()}
     <tr>
       <td align="right">{$i18n.form.users.role}:</td>
       <td>{$forms.userForm.role.control} {$forms.userForm.client.control}</td>
     </tr>
+<tbody id="non_client_block">
+{if $show_quota}
+    <tr>
+      <td align="right">{$i18n.label.quota}&nbsp;(%):</td>
+      <td>{$forms.userForm.quota_percent.control} <a href="https://www.anuko.com/lp/tt_27.htm" target="_blank">{$i18n.label.what_is_it}</a></td>
+    </tr>
 {/if}
     <tr>
-      <td align="right">{$i18n.form.users.default_rate}&nbsp;(0{$user->decimal_mark}00):</td>
+      <td align="right">{$i18n.form.users.default_rate}&nbsp;(0{$user->getDecimalMark()}00):</td>
       <td>{$forms.userForm.rate.control}</td>
     </tr>
-{if ($smarty.const.MODE_PROJECTS == $user->tracking_mode || $smarty.const.MODE_PROJECTS_AND_TASKS == $user->tracking_mode)}
+</tbody>
+{if $show_projects}
+<tbody id="projects_control">
+    <tr><td>&nbsp;</td></tr>
     <tr valign="top">
       <td align="right">{$i18n.label.projects}:</td>
       <td>{$forms.userForm.projects.control}</td>
     </tr>
+</tbody>
+{/if}
     <tr>
       <td colspan="2" align="center">{$i18n.label.required_fields}</td>
     </tr>
-{/if}
     <tr>
       <td colspan="2" align="center" height="50">{$forms.userForm.btn_submit.control}</td>
     </tr>

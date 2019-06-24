@@ -27,6 +27,7 @@
 // +----------------------------------------------------------------------+
 
 import('Period');
+import('ttTimeHelper');
 
 // Definitions for chart types.
 define('CHART_PROJECTS', 1);
@@ -36,79 +37,78 @@ define('CHART_CLIENTS', 3);
 // Class ttChartHelper is a helper class for charts.
 class ttChartHelper {
 
-  // getTotals - returns total times by project or activity for a given user in a specified period.
-  static function getTotals($user_id, $ch_type, $cl_date, $cl_period = null) {
+  // getTotals - returns total times by project or task for a given user in a specified period.
+  static function getTotals($user_id, $chart_type, $selected_date, $interval_type) {
 
     $period = null;
-    if (isset($cl_period) && isset($cl_date)) {
-      switch ($cl_period) {
-        case INTERVAL_THIS_DAY:
-          $period = new Period(INTERVAL_THIS_DAY, new DateAndTime(DB_DATEFORMAT, $cl_date));
-          break;
+    switch ($interval_type) {
+      case INTERVAL_THIS_DAY:
+        $period = new Period(INTERVAL_THIS_DAY, new DateAndTime(DB_DATEFORMAT, $selected_date));
+        break;
  
-        case INTERVAL_THIS_WEEK:
-          $period = new Period(INTERVAL_THIS_WEEK, new DateAndTime(DB_DATEFORMAT, $cl_date));
-          break;
+      case INTERVAL_THIS_WEEK:
+        $period = new Period(INTERVAL_THIS_WEEK, new DateAndTime(DB_DATEFORMAT, $selected_date));
+        break;
 
-        case INTERVAL_THIS_MONTH:
-          $period = new Period(INTERVAL_THIS_MONTH, new DateAndTime(DB_DATEFORMAT, $cl_date));
-          break;
+      case INTERVAL_THIS_MONTH:
+        $period = new Period(INTERVAL_THIS_MONTH, new DateAndTime(DB_DATEFORMAT, $selected_date));
+        break;
 
-        case INTERVAL_THIS_YEAR:
-          $period = new Period(INTERVAL_THIS_YEAR, new DateAndTime(DB_DATEFORMAT, $cl_date));
-          break;
-      }
+      case INTERVAL_THIS_YEAR:
+        $period = new Period(INTERVAL_THIS_YEAR, new DateAndTime(DB_DATEFORMAT, $selected_date));
+        break;
     }
-   	
+
     $result = array();
     $mdb2 = getConnection();
 
     $q_period = '';
     if ($period != null) {
-      $q_period = " and date >= '".$period->getBeginDate(DB_DATEFORMAT)."' and date <= '".$period->getEndDate(DB_DATEFORMAT)."'";
+      $q_period = " and date >= '".$period->getStartDate(DB_DATEFORMAT)."' and date <= '".$period->getEndDate(DB_DATEFORMAT)."'";
     }
-    if (CHART_PROJECTS == $ch_type) {
+    if (CHART_PROJECTS == $chart_type) {
       // Data for projects.
       $sql = "select p.name as name, sum(time_to_sec(l.duration)) as time from tt_log l
         left join tt_projects p on (p.id = l.project_id)
-        where l.status = 1 and l.duration > 0 and l.user_id = $user_id $q_period group by l.project_id";
-    } elseif (CHART_TASKS == $ch_type) {
+        where l.status = 1 and l.user_id = $user_id $q_period group by l.project_id";
+    } elseif (CHART_TASKS == $chart_type) {
       // Data for tasks.
       $sql = "select t.name as name, sum(time_to_sec(l.duration)) as time from tt_log l
         left join tt_tasks t on (t.id = l.task_id)
-        where l.status = 1 and l.duration > 0 and l.user_id = $user_id $q_period group by l.task_id";
-    } elseif (CHART_CLIENTS == $ch_type) {
+        where l.status = 1 and l.user_id = $user_id $q_period group by l.task_id";
+    } elseif (CHART_CLIENTS == $chart_type) {
       // Data for clients.
-      $sql = "select coalesce(c.name, 'NULL') as name, sum(time_to_sec(l.duration)) as time from tt_log l
+      $sql = "select c.name as name, sum(time_to_sec(l.duration)) as time from tt_log l
         left join tt_clients c on (c.id = l.client_id)
-        where l.status = 1 and l.duration > 0 and l.user_id = $user_id $q_period group by l.client_id";    	
+        where l.status = 1 and l.user_id = $user_id $q_period group by l.client_id";
     }
-    
+
     $res = $mdb2->query($sql);
     if (!is_a($res, 'PEAR_Error')) {
       while ($val = $res->fetchRow()) {
-        $result[] = array('name'=>$val['name'],'time'=>$val['time']); // name  - project name, time - total for project in seconds.
+        if ($val['time'] >= 0) // Only positive totals make sense in pie charts. Skip negatives entirely.
+          $result[] = array('name'=>$val['name'],'time'=>$val['time']); // name - project name, time - total for project in seconds.
       }
     }
-    
-    // Get total time. We'll need it calculate percentages (for labels to the right of diagram).
+
+    // Get total time. We'll need it to calculate percentages (for labels to the right of diagram).
     $total = 0;
     foreach ($result as $one_val) {
       $total += $one_val['time'];
-	}
-	// Add a string representation of time + percentage to names. Example: "Time Tracker (1:15 - 6%)".
-	foreach ($result as &$one_val) {
-	  $percent = round(100*$one_val['time']/$total).'%';
-      $one_val['name'] .= ' ('.sec_to_time_fmt_hm($one_val['time']).' - '.$percent.')';
-	}
-	    
-    // Note: the remaining code here is needed to display labels on the side of a diagram.
-    // We print lables ourselves (not using libchart.php) because quality of libchart labels is not good. 
-	
-	// Note: Optimize this sorting and reversing.
+    }
+    // Add a string representation of time + percentage to names. Example: "Time Tracker (1:15 - 6%)".
+    foreach ($result as &$one_val) {
+      $percent = round(100*$one_val['time']/$total).'%';
+      $one_val['name'] .= ' ('.ttTimeHelper::minutesToDuration($one_val['time'] / 60).' - '.$percent.')';
+    }
+
+    // Note: the remaining code here is needed to display labels on the side of the diagram.
+    // We print labels ourselves (not using libchart.php) because quality of libchart labels is not good.
+
+    // Note: Optimize this sorting and reversing.
     $result = mu_sort($result, 'time');
     $result = array_reverse($result); // This is to assign correct colors to labels.
-        
+
     // Add color to array items. This is used in labels on the side of a chart.
     $colors = array(
       array(2, 78, 0),
@@ -131,7 +131,42 @@ class ttChartHelper {
       $color = $colors[$i%count($colors)];
       $result[$i]['color_html'] = sprintf('#%02x%02x%02x', $color[0], $color[1], $color[2]);
     }
-			
+
     return $result;
+  }
+
+  // adjustType - adjust chart type to something that is available for a group.
+  static function adjustType($requested_type) {
+    global $user;
+    $tracking_mode = $user->getTrackingMode();
+    $client_option = $user->isPluginEnabled('cl');
+
+    // We have 3 possible options for chart type: projects, tasks, or clients.
+    // Deal with each one individually.
+
+    if ($requested_type == CHART_PROJECTS) {
+      if ($tracking_mode == MODE_PROJECTS || $tracking_mode == MODE_PROJECTS_AND_TASKS)
+        return CHART_PROJECTS;
+      else if ($client_option)
+        return CHART_CLIENTS;
+    }
+
+    if ($requested_type == CHART_TASKS) {
+      if ($tracking_mode == MODE_PROJECTS_AND_TASKS)
+        return CHART_TASKS;
+      if ($tracking_mode == MODE_PROJECTS)
+        return CHART_PROJECTS;
+      else if ($client_option)
+        return CHART_CLIENTS;
+    }
+
+    if ($requested_type == CHART_CLIENTS) {
+      if ($client_option)
+        return CHART_CLIENTS;
+      else if ($tracking_mode == MODE_PROJECTS || ($tracking_mode == MODE_PROJECTS_AND_TASKS))
+        return CHART_PROJECTS;
+    }
+
+    return  CHART_PROJECTS;
   }
 }

@@ -29,89 +29,107 @@
 // The ttExpenseHelper is a class to help with expense items.
 class ttExpenseHelper {
   // insert - inserts an entry into tt_expense_items table.
-  static function insert($fields)
-  {
+  static function insert($fields) {
+    global $user;
     $mdb2 = getConnection();
 
+    $user_id = $user->getUser();
+    $group_id = $user->getGroup();
+    $org_id = $user->org_id;
+
     $date = $fields['date'];
-    $user_id = (int) $fields['user_id'];
     $client_id = $fields['client_id'];
     $project_id = $fields['project_id'];
     $name = $fields['name'];
     $cost = str_replace(',', '.', $fields['cost']);
     $invoice_id = $fields['invoice_id'];
     $status = $fields['status'];
+    $paid = (int) $fields['paid'];
+    $created = ', now(), '.$mdb2->quote($_SERVER['REMOTE_ADDR']).', '.$user->id;
 
-    $sql = "insert into tt_expense_items (date, user_id, client_id, project_id, name, cost, invoice_id, status) ".
-      "values (".$mdb2->quote($date).", $user_id, ".$mdb2->quote($client_id).", ".$mdb2->quote($project_id).
-      ", ".$mdb2->quote($name).", ".$mdb2->quote($cost).", ".$mdb2->quote($invoice_id).", ".$mdb2->quote($status).")";
+    $sql = "insert into tt_expense_items".
+      " (date, user_id, group_id, org_id, client_id, project_id, name, cost, invoice_id, paid, created, created_ip, created_by, status)".
+      " values (".$mdb2->quote($date).", $user_id, $group_id, $org_id, ".$mdb2->quote($client_id).", ".$mdb2->quote($project_id).
+      ", ".$mdb2->quote($name).", ".$mdb2->quote($cost).", ".$mdb2->quote($invoice_id).", $paid $created, ".$mdb2->quote($status).")";
     $affected = $mdb2->exec($sql);
-    if (is_a($affected, 'PEAR_Error'))
-      return false;
-
-    $id = $mdb2->lastInsertID('tt_expense_items', 'id');
-    return $id;
+    return (!is_a($affected, 'PEAR_Error'));
   }
 
   // update - updates a record in tt_expense_items table.
-  static function update($fields)
-  {
+  static function update($fields) {
+    global $user;
     $mdb2 = getConnection();
+
+    $user_id = $user->getUser();
+    $group_id = $user->getGroup();
+    $org_id = $user->org_id;
 
     $id = (int) $fields['id'];
     $date = $fields['date'];
-    $user_id = (int) $fields['user_id'];
     $client_id = $fields['client_id'];
     $project_id = $fields['project_id'];
     $name = $fields['name'];
     $cost = str_replace(',', '.', $fields['cost']);
     $invoice_id = $fields['invoice_id'];
 
-    $sql = "UPDATE tt_expense_items set date = ".$mdb2->quote($date).", user_id = $user_id, client_id = ".$mdb2->quote($client_id).
+    $paid_part = '';
+    if ($user->can('manage_invoices') && $user->isPluginEnabled('ps')) {
+      $paid_part = $fields['paid'] ? ', paid = 1' : ', paid = 0';
+    }
+    $modified_part = ', modified = now(), modified_ip = '.$mdb2->quote($_SERVER['REMOTE_ADDR']).', modified_by = '.$user->id;
+
+    $sql = "update tt_expense_items set date = ".$mdb2->quote($date).", user_id = $user_id, client_id = ".$mdb2->quote($client_id).
       ", project_id = ".$mdb2->quote($project_id).", name = ".$mdb2->quote($name).
-      ", cost = ".$mdb2->quote($cost).", invoice_id = ".$mdb2->quote($invoice_id).
-      " WHERE id = $id";
-
+      ", cost = ".$mdb2->quote($cost)."$paid_part $modified_part, invoice_id = ".$mdb2->quote($invoice_id).
+      " where id = $id and group_id = $group_id and org_id = $org_id";
     $affected = $mdb2->exec($sql);
-    if (is_a($affected, 'PEAR_Error'))
-      return false;
-
-    return true;
+    return (!is_a($affected, 'PEAR_Error'));
   }
 
   // markDeleted - marks an item as deleted in tt_expense_items table.
-  static function markDeleted($id, $user_id) {
+  static function markDeleted($id) {
+    global $user;
     $mdb2 = getConnection();
 
-    $sql = "update tt_expense_items set status = NULL where id = $id and user_id = $user_id";
-    $affected = $mdb2->exec($sql);
-    if (is_a($affected, 'PEAR_Error'))
-      return false;
+    $user_id = $user->getUser();
+    $group_id = $user->getGroup();
+    $org_id = $user->org_id;
 
-    return true;
+    $sql = "update tt_expense_items set status = null".
+      " where id = $id and user_id = $user_id and group_id = $group_id and org_id = $org_id";
+    $affected = $mdb2->exec($sql);
+    return (!is_a($affected, 'PEAR_Error'));
   }
 
   // getTotalForDay - gets total expenses for a user for a specific date.
-  static function getTotalForDay($user_id, $date) {
+  static function getTotalForDay($date) {
     global $user;
-
     $mdb2 = getConnection();
 
-    $sql = "select sum(cost) as sm from tt_expense_items where user_id = $user_id and date = ".$mdb2->quote($date)." and status = 1";
+    $user_id = $user->getUser();
+    $group_id = $user->getGroup();
+    $org_id = $user->org_id;
+
+    $sql = "select sum(cost) as total from tt_expense_items".
+      " where user_id = $user_id and group_id = $group_id and org_id = $org_id".
+      " and date = ".$mdb2->quote($date)." and status = 1";
     $res = $mdb2->query($sql);
     if (!is_a($res, 'PEAR_Error')) {
       $val = $res->fetchRow();
-      $val['sm'] = str_replace('.', $user->decimal_mark, $val['sm']);
-      return $val['sm'];
+      $val['total'] = str_replace('.', $user->getDecimalMark(), $val['total']);
+      return $val['total'];
     }
     return false;
   }
 
   // getItem - retrieves an entry from tt_expense_items table.
-  static function getItem($id, $user_id) {
+  static function getItem($id) {
     global $user;
-
     $mdb2 = getConnection();
+
+    $user_id = $user->getUser();
+    $group_id = $user->getGroup();
+    $org_id = $user->org_id;
 
     $client_field = null;
     if ($user->isPluginEnabled('cl'))
@@ -122,17 +140,17 @@ class ttExpenseHelper {
     if ($user->isPluginEnabled('cl'))
       $left_joins .= " left join tt_clients c on (ei.client_id = c.id)";
 
-    $sql = "select ei.id, ei.date, ei.client_id, ei.project_id, ei.name, ei.cost, ei.invoice_id $client_field, p.name as project_name
-      from tt_expense_items ei
-      $left_joins
-      where ei.id = $id and ei.user_id = $user_id and ei.status = 1";
+    $sql = "select ei.id, ei.date, ei.client_id, ei.project_id, ei.name, ei.cost, ei.invoice_id, ei.approved,".
+      " ei.paid $client_field, p.name as project_name".
+      " from tt_expense_items ei $left_joins".
+      " where ei.id = $id and ei.group_id = $group_id and ei.org_id = $org_id and ei.user_id = $user_id and ei.status = 1";
     $res = $mdb2->query($sql);
     if (!is_a($res, 'PEAR_Error')) {
       if (!$res->numRows()) {
         return false;
       }
       if ($val = $res->fetchRow()) {
-        $val['cost'] = str_replace('.', $user->decimal_mark, $val['cost']);
+        $val['cost'] = str_replace('.', $user->getDecimalMark(), $val['cost']);
         return $val;
       }
     }
@@ -140,11 +158,15 @@ class ttExpenseHelper {
   }
 
   // getItems - returns expense items for a user for a given date.
-  static function getItems($user_id, $date) {
+  static function getItems($date) {
     global $user;
+    $mdb2 = getConnection();
+
+    $user_id = $user->getUser();
+    $group_id = $user->getGroup();
+    $org_id = $user->org_id;
 
     $result = array();
-    $mdb2 = getConnection();
 
     $client_field = null;
     if ($user->isPluginEnabled('cl'))
@@ -155,16 +177,15 @@ class ttExpenseHelper {
     if ($user->isPluginEnabled('cl'))
       $left_joins .= " left join tt_clients c on (ei.client_id = c.id)";
 
-    $sql = "select ei.id as id $client_field, p.name as project, ei.name as item, ei.cost as cost,
-      ei.invoice_id from tt_expense_items ei
-      $left_joins
-      where ei.date = ".$mdb2->quote($date)." and ei.user_id = $user_id and ei.status = 1
-      order by ei.id";
+    $sql = "select ei.id as id $client_field, p.name as project, ei.name as item, ei.cost as cost,".
+      " ei.invoice_id, ei.approved from tt_expense_items ei $left_joins".
+      " where ei.date = ".$mdb2->quote($date)." and ei.user_id = $user_id".
+      " and ei.group_id = $group_id and ei.org_id = $org_id and ei.status = 1 order by ei.id";
 
     $res = $mdb2->query($sql);
     if (!is_a($res, 'PEAR_Error')) {
       while ($val = $res->fetchRow()) {
-      	$val['cost'] = str_replace('.', $user->decimal_mark, $val['cost']);
+      	$val['cost'] = str_replace('.', $user->getDecimalMark(), $val['cost']);
         $result[] = $val;
       }
     } else return false;

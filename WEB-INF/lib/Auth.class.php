@@ -36,7 +36,8 @@ class Auth {
 //          die ("Your browser's cookie functionality is turned off. Please turn it on.");
 //        }
 
-      $GLOBALS['SMARTY']->assign('authenticated', true); // Used in header.tpl for menu display.
+      global $smarty;
+      $smarty->assign('authenticated', true); // Used in header.tpl for menu display.
       return true;
     }
     session_write_close();
@@ -63,7 +64,7 @@ class Auth {
   function doLogin($login, $password) {
     $auth = $this->authenticate($login, $password);
 
-    if (defined('AUTH_DEBUG') && isTrue(AUTH_DEBUG)) {
+    if (isTrue('DEBUG')) {
       echo '<br>'; var_dump($auth); echo '<br />';
     }
 
@@ -76,13 +77,13 @@ class Auth {
     $sql = "SELECT id FROM tt_users WHERE login = ".$mdb2->quote($login)." AND status = 1";
     $res = $mdb2->query($sql);
     if (is_a($res, 'PEAR_Error')) {
-      if (defined('AUTH_DEBUG') && isTrue(AUTH_DEBUG))
+      if (isTrue('DEBUG'))
         echo 'db error!<br />';
       return false;
     }
     $val = $res->fetchRow();
     if (!$val['id']) {
-      if (defined('AUTH_DEBUG') && isTrue(AUTH_DEBUG))
+      if (isTrue('DEBUG'))
         echo 'login "'.$login.'" does not exist in Time Tracker database.<br />';
       return false;
     }

@@ -29,21 +29,29 @@
 require_once('initialize.php');
 import('form.Form');
 import('ttProjectHelper');
-import('ttTeamHelper');
+import('ttGroupHelper');
+import('ttFileHelper');
 
-// Access check.
-if (!ttAccessCheck(right_manage_team) || (MODE_PROJECTS != $user->tracking_mode && MODE_PROJECTS_AND_TASKS != $user->tracking_mode)) {
+// Access checks.
+if (!ttAccessAllowed('manage_projects')) {
   header('Location: access_denied.php');
   exit();
 }
+if (MODE_PROJECTS != $user->getTrackingMode() && MODE_PROJECTS_AND_TASKS != $user->getTrackingMode()) {
+  header('Location: feature_disabled.php');
+  exit();
+}
+// End of access checks.
 
-$users = ttTeamHelper::getActiveUsers();
+$showFiles = $user->isPluginEnabled('at');
+$users = ttGroupHelper::getActiveUsers();
 foreach ($users as $user_item)
   $all_users[$user_item['id']] = $user_item['name'];
 
-$tasks = ttTeamHelper::getActiveTasks($user->team_id);
+$tasks = ttGroupHelper::getActiveTasks();
 foreach ($tasks as $task_item)
   $all_tasks[$task_item['id']] = $task_item['name'];
+$show_tasks = MODE_PROJECTS_AND_TASKS == $user->getTrackingMode() && count($tasks) > 0;
 
 if ($request->isPost()) {
   $cl_name = trim($request->getParameter('project_name'));
@@ -60,36 +68,51 @@ if ($request->isPost()) {
 $form = new Form('projectForm');
 $form->addInput(array('type'=>'text','maxlength'=>'100','name'=>'project_name','style'=>'width: 250px;','value'=>$cl_name));
 $form->addInput(array('type'=>'textarea','name'=>'description','style'=>'width: 250px; height: 40px;','value'=>$cl_description));
+if ($showFiles)
+  $form->addInput(array('type'=>'upload','name'=>'newfile','value'=>$i18n->get('button.submit')));
 $form->addInput(array('type'=>'checkboxgroup','name'=>'users','data'=>$all_users,'layout'=>'H','value'=>$cl_users));
-if (MODE_PROJECTS_AND_TASKS == $user->tracking_mode)
+if ($show_tasks)
   $form->addInput(array('type'=>'checkboxgroup','name'=>'tasks','data'=>$all_tasks,'layout'=>'H','value'=>$cl_tasks));
-$form->addInput(array('type'=>'submit','name'=>'btn_add','value'=>$i18n->getKey('button.add')));
+$form->addInput(array('type'=>'submit','name'=>'btn_add','value'=>$i18n->get('button.add')));
 
 if ($request->isPost()) {
   // Validate user input.
-  if (!ttValidString($cl_name)) $err->add($i18n->getKey('error.field'), $i18n->getKey('label.thing_name'));
-  if (!ttValidString($cl_description, true)) $err->add($i18n->getKey('error.field'), $i18n->getKey('label.description'));
+  if (!ttValidString($cl_name)) $err->add($i18n->get('error.field'), $i18n->get('label.thing_name'));
+  if (!ttValidString($cl_description, true)) $err->add($i18n->get('error.field'), $i18n->get('label.description'));
+  if (!ttGroupHelper::validateCheckboxGroupInput($cl_users, 'tt_users')) $err->add($i18n->get('error.field'), $i18n->get('label.users'));
+  if (!ttGroupHelper::validateCheckboxGroupInput($cl_tasks, 'tt_tasks')) $err->add($i18n->get('error.field'), $i18n->get('label.tasks'));
 
   if ($err->no()) {
     if (!ttProjectHelper::getProjectByName($cl_name)) {
-      if (ttProjectHelper::insert(array(
-        'team_id' => $user->team_id,
-        'name' => $cl_name,
+      $id = ttProjectHelper::insert(array('name' => $cl_name,
         'description' => $cl_description,
         'users' => $cl_users,
         'tasks' => $cl_tasks,
-        'status' => ACTIVE))) {
-          header('Location: projects.php');
-          exit();
-        } else
-          $err->add($i18n->getKey('error.db'));
+        'status' => ACTIVE));
+
+      // Put a new file in storage if we have it.
+      if ($id && $showFiles && $_FILES['newfile']['name']) {
+        $fileHelper = new ttFileHelper($err);
+        $fields = array('entity_type'=>'project',
+          'entity_id' => $id,
+          'file_name' => $_FILES['newfile']['name']);
+        $fileHelper->putFile($fields);
+      }
+      if ($id) {
+        header('Location: projects.php');
+        exit();
+      } else
+        $err->add($i18n->get('error.db'));
     } else
-      $err->add($i18n->getKey('error.project_exists'));
+      $err->add($i18n->get('error.object_exists'));
   }
 } // isPost
 
 $smarty->assign('forms', array($form->getName()=>$form->toArray()));
 $smarty->assign('onload', 'onLoad="document.projectForm.project_name.focus()"');
-$smarty->assign('title', $i18n->getKey('title.add_project'));
+$smarty->assign('show_files', $showFiles);
+$smarty->assign('show_users', count($users) > 0);
+$smarty->assign('show_tasks', $show_tasks);
+$smarty->assign('title', $i18n->get('title.add_project'));
 $smarty->assign('content_page_name', 'project_add.tpl');
 $smarty->display('index.tpl');

@@ -28,39 +28,47 @@
 
 // Note: escape apostrophes with THREE backslashes, like here:  choisir l\\\'option.
 // Other characters (such as double-quotes in http links, etc.) do not have to be escaped.
-
-$i18n_language = 'فارسی';
+$i18n_language = 'Persian (فارسی)';
+// TODO: translate the following.
 $i18n_months = array('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December');
 $i18n_weekdays = array('Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday');
 $i18n_weekdays_short = array('Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa');
-// format mm/dd
-$i18n_holidays = array('01/01', '01/16', '02/20', '05/28', '07/04', '09/03', '10/10', '11/11', '11/24', '12/25');
 
 $i18n_key_words = array(
 'language.rtl' => 'true', // Right-to-left language. Do not remove this line from RTL language files. This is the only string that is not found in the master English file.
 
-// Menus - short selection strings that are displayed on the top of application web pages.
+// Menus - short selection strings that are displayed on top of application web pages.
 // Example: https://timetracker.anuko.com (black menu on top).
 'menu.login' => 'ورود',
 'menu.logout' => 'خروج',
 'menu.forum' => 'فروم',
 'menu.help' => 'راهنما',
-'menu.create_team' => 'ایجاد گروه',
+// TODO: translate the following.
+// 'menu.register' => 'Register',
 'menu.profile' => 'پروفايل',
+// TODO: translate the following.
+// 'menu.group' => 'Group',
+'menu.plugins' => 'پلاگین ها',
 'menu.time' => 'زمان',
+// TODO: translate the following.
+// 'menu.week' => 'Week',
 'menu.expenses' => 'هزينه ها',
 'menu.reports' => 'گزارشات',
+// TODO: translate the following.
+// 'menu.timesheets' => 'Timesheets',
 'menu.charts' => 'نمودارها',
 'menu.projects' => 'پروژه ها',
 'menu.tasks' => 'وظايف',
 'menu.users' => 'کاربران',
-'menu.teams' => 'گروه ها',
+// TODO: translate the following.
+// 'menu.groups' => 'Groups',
+// 'menu.subgroups' => 'Subgroups',
 'menu.export' => 'پشتیبانی',
 'menu.clients' => 'مشتری ها',
 'menu.options' => 'تنظیمات',
 
 // Footer - strings on the bottom of most pages.
-// TODO: translate the following strings.
+// TODO: translate the following.
 // 'footer.contribute_msg' => 'You can contribute to Time Tracker in different ways.',
 // 'footer.credits' => 'Credits',
 // 'footer.license' => 'License',
@@ -68,40 +76,64 @@ $i18n_key_words = array(
                                      // This is a link to a webpage that describes how to contribute to the project.
 
 // Error messages.
-// TODO: translate the following string.
+// TODO: translate the following.
 // 'error.access_denied' => 'Access denied.',
 'error.sys' => 'خطا در سیستم.',
 'error.db' => 'خطا در پایگاه داده.',
+// TODO: translate the following.
+// 'error.feature_disabled' => 'Feature is disabled.',
 'error.field' => 'داده اشتباه در "{0}".',
 'error.empty' => 'فیلد "{0}" خالیست.',
 'error.not_equal' => 'فیلد "{0}" با فیلد "{1}" برابر نیست.',
-// TODO: translate error.interval.
-'error.interval' => 'Field "{0}" must be greater than "{1}".',
+// TODO: translate the following.
+// 'error.interval' => 'Field "{0}" must be greater than "{1}".',
 'error.project' => 'انتخاب پروژه.',
 'error.task' => 'انتخاب وظیفه.',
 'error.client' => 'انتخاب مشتری.',
-// TODO: translate the following string.
+// TODO: translate the following.
 // 'error.report' => 'Select report.',
+// 'error.record' => 'Select record.',
 'error.auth' => 'نام کاربری یا رمز عبور اشتباه است.',
 'error.user_exists' => 'کاربری با این نام کاربری موجود است.',
-'error.project_exists' => 'پروژه ای با این نام موجود است.',
-'error.task_exists' => 'وظیفه ای با این نام هم اکنون وجود دارد.',
-'error.client_exists' => 'مشتری با این نام هم اکنون وجود دارد.',
+// TODO: translate the following.
+// 'error.object_exists' => 'Object with this name already exists.',
 'error.invoice_exists' => 'فاکتوری با این شماره هم اکنون موجود است.',
+// TODO: translate the following.
+// 'error.role_exists' => 'Role with this rank already exists.',
 'error.no_invoiceable_items' => 'آیتمی جهت فاکتور کردن وجود ندارد.',
+// TODO: translate the following.
+// 'error.no_records' => 'There are no records.',
 'error.no_login' => 'کاربری با این نام کاربری موجود نیست.',
-'error.no_teams' => 'پایگاه داده شما خالی است با کاربر admin وارد شوید و تیم ایجاد کنید.',
+'error.no_groups' => 'پایگاه داده شما خالی است با کاربر admin وارد شوید و تیم ایجاد کنید.',  // TODO: replace "team" with "group".
 'error.upload' => 'خطا در آپلود فایل.',
-// TODO: Translate the following:
+// TODO: translate the following.
 // 'error.range_locked' => 'Date range is locked.',
 'error.mail_send' => 'خطا در ارسال ایمیل.',
+// TODO: improve the translation above by adding MAIL_SMTP_DEBUG part.
+// 'error.mail_send' => 'Error sending mail. Use MAIL_SMTP_DEBUG for diagnostics.',
 'error.no_email' => 'ایمیل مرتبط با این نام کاربری موجود نیست.',
 // TODO: check translation and punctuation of error.uncompleted_exists. Is the sentence ending dot in the right place?
 'error.uncompleted_exists' => 'قسمت ناتمامی موجود است. آن را تمام یا حذف کنید.',
 'error.goto_uncompleted' => 'مراجعه به قسمت ناتمام.',
 'error.overlap' => 'بازه زمانی با سوابق موجود هم پوشانی دارد.',
-// TODO: translate the following string.
+// TODO: translate the following.
 // 'error.future_date' => 'Date is in future.',
+// 'error.xml' => 'Error in XML file at line %d: %s.',
+// 'error.cannot_import' => 'Cannot import: %s.',
+// 'error.format' => 'Invalid file format.',
+// 'error.user_count' => 'Limit on user count.',
+// 'error.expired' => 'Expiration date reached.',
+// TODO: translate the following.
+// 'error.file_storage' => 'File storage error.',
+
+// Warning messages.
+// TODO: translate the following.
+// 'warn.sure' => 'Are you sure?',
+// 'warn.confirm_save' => 'Date has changed. Confirm saving, not copying this item.',
+
+// Success messages.
+// TODO: translate the following.
+// 'msg.success' => 'Operation completed successfully.',
 
 // Labels for buttons.
 'button.login' => 'ورود',
@@ -110,25 +142,23 @@ $i18n_key_words = array(
 'button.copy' => 'کپی',
 'button.cancel' => 'لغو',
 'button.submit' => 'ثبت',
-'button.add_user' => 'درج کاربر',
-'button.add_project' => 'درج پروژه',
-'button.add_task' => 'درج وظیفه',
-'button.add_client' => 'درج مشتری',
-'button.add_invoice' => 'درج فاکتور',
-'button.add_option' => 'درج گزینه',
 'button.add' => 'درج',
+'button.delete' => 'حذف',
 'button.generate' => 'تولید',
 'button.reset_password' => 'بازسازی رمزعبور',
 'button.send' => 'ارسال',
 'button.send_by_email' => 'ارسال به ایمیل',
-'button.create_team' => 'ایجاد تیم',
-'button.export' => 'ایجاد پشتیبان از تیم',
-'button.import' => 'وارد کردن تیم',
+'button.create_group' => 'ایجاد تیم', // TODO: replace "team" with "group".
+'button.export' => 'ایجاد پشتیبان از تیم', // TODO: replace "team" with "group".
+'button.import' => 'وارد کردن تیم', // TODO: replace "team" with "group".
 'button.close' => 'بستن',
 'button.stop' => 'توقف',
+// TODO: translate the following.
+// 'button.approve' => 'Approve',
+// 'button.disapprove' => 'Disapprove',
 
 // Labels for controls on forms. Labels in this section are used on multiple forms.
-'label.team_name' => 'نام تیم',
+'label.group_name' => 'نام تیم', // TODO: replace "team" with "group".
 'label.address' => 'آدرس',
 'label.currency' => 'واحد پول',
 'label.manager_name' => 'نام مدیر',
@@ -139,14 +169,22 @@ $i18n_key_words = array(
 'label.password' => 'رمز عبور',
 'label.confirm_password' => 'تکرار رمزعبور',
 'label.email' => 'ایمیل',
+'label.cc' => 'کپی',
+// TODO: translate the following.
+// 'label.bcc' => 'Bcc',
+'label.subject' => 'موضوع',
 'label.date' => 'تاریخ',
 'label.start_date' => 'تاریخ شروع',
 'label.end_date' => 'تاریخ اتمام',
 'label.user' => 'کاربر',
 'label.users' => 'کاربران',
+// TODO: translate the following.
+// 'label.group' => 'Group',
+// 'label.subgroups' => 'Subgroups',
+// 'label.roles' => 'Roles',
 'label.client' => 'مشتری',
 'label.clients' => 'مشتریان',
-// TODO: translate the following string.
+// TODO: translate the following.
 // 'label.option' => 'Option',
 'label.invoice' => 'فاکتور',
 'label.project' => 'پروژه',
@@ -158,24 +196,29 @@ $i18n_key_words = array(
 'label.finish' => 'اتمام',
 'label.duration' => 'مدت زمان',
 'label.note' => 'توضیح',
+// TODO: translate the following.
+// 'label.notes' => 'Notes',
 'label.item' => 'آیتم',
 'label.cost' => 'هزینه',
+// TODO: translate the following.
+// 'label.ip' => 'IP',
 'label.day_total' => 'کل روز',
 'label.week_total' => 'کل هفته',
 // TODO: translate the following.
 // 'label.month_total' => 'Month total',
 'label.today' => 'امروز',
-'label.total_hours' => 'مجموع ساعت',
-'label.total_cost' => 'مجموع هزینه ها',
 'label.view' => 'نمایش',
 'label.edit' => 'ویرایش',
 'label.delete' => 'حذف',
 'label.configure' => 'پیکربندی',
 'label.select_all' => 'انتخاب همه',
 'label.select_none' => 'لغو انتخاب همه',
+// TODO: translate the following.
+// 'label.day_view' => 'Day view',
+// 'label.week_view' => 'Week view',
 'label.id' => 'شناسه',
 'label.language' => 'زبان',
-// TODO: translate the following string.
+// TODO: translate the following.
 // 'label.decimal_mark' => 'Decimal mark',
 'label.date_format' => 'قالب تاریخ',
 'label.time_format' => 'قالب زمان',
@@ -195,8 +238,11 @@ $i18n_key_words = array(
 'label.role_manager' => '(مدیر)',
 'label.role_comanager' => '(دستیار مدیر)',
 'label.role_admin' => '(مدیر ارشد)',
-// Translate the following string.
+// Translate the following.
 // 'label.page' => 'Page',
+// 'label.condition' => 'Condition',
+// 'label.yes' => 'yes',
+// 'label.no' => 'no',
 // Labels for plugins (extensions to Time Tracker that provide additional features).
 'label.custom_fields' => 'فیلدهای سفارشی',
 // Translate the following.
@@ -206,32 +252,69 @@ $i18n_key_words = array(
 'label.type_text' => 'متن',
 'label.required' => 'اجباری',
 'label.fav_report' => 'گزارش های برگزیده',
-// TODO: translate the following strings.
-// 'label.cron_schedule' => 'Cron schedule',
+// TODO: translate the following.
+// 'label.schedule' => 'Schedule',
 // 'label.what_is_it' => 'What is it?',
+// 'label.expense' => 'Expense',
+// 'label.quantity' => 'Quantity',
+// 'label.paid_status' => 'Paid status',
+// 'label.paid' => 'Paid',
+// 'label.mark_paid' => 'Mark paid',
+// 'label.week_menu' => 'Week menu',
+// 'label.week_note' => 'Week note',
+// 'label.week_list' => 'Week list',
+// 'label.work_units' => 'Work units',
+// 'label.work_units_short' => 'Units',
+// 'label.totals_only' => 'Totals only',
+// 'label.quota' => 'Quota',
+// 'label.timesheet' => 'Timesheet',
+// 'label.submitted' => 'Submitted',
+// 'label.approved' => 'Approved',
+// 'label.approval' => 'Report approval',
+// 'label.mark_approved' => 'Mark approved',
+// 'label.template' => 'Template',
+// 'label.attachments' => 'Attachments',
+// 'label.files' => 'Files',
+// 'label.file' => 'File',
+// 'label.image' => 'Image',
+// 'label.download' => 'Download',
+'label.active_users' => 'کاربران فعال',
+'label.inactive_users' => 'کاربران غیرفعال',
 
 // Form titles.
+'title.error' => 'خطا',
+// TODO: Translate the following.
+// 'title.success' => 'Success',
 'title.login' => 'ورود',
-'title.teams' => 'تیم ها',
-'title.create_team' => 'ایجاد تیم',
-// TODO: translate the following string.
-// 'title.edit_team' => 'Editing Team',
-'title.delete_team' => 'حذف تیم',
+'title.groups' => 'تیم ها', // TODO: change "teams" to "groups".
+// TODO: translate the following.
+// 'title.subgroups' => 'Subgroups',
+// 'title.add_group' => 'Adding Group',
+// 'title.edit_group' => 'Editing Group',
+'title.delete_group' => 'حذف تیم', // TODO: change "team" to "group".
 'title.reset_password' => 'بازیابی رمزعبور',
 'title.change_password' => 'تغییر رمزعبور',
 'title.time' => 'زمان',
 'title.edit_time_record' => 'ویرایش رکورد زمان',
 'title.delete_time_record' => 'حذف رکورد زمان',
+// TODO: Translate the following.
+// 'title.time_files' => 'Time Record Files',
 'title.expenses' => 'هزینه ها',
 'title.edit_expense' => 'ویرایش آیتم هزینه ها',
 'title.delete_expense' => 'حذف آیتم هزینه ها',
 'title.reports' => 'گزارشات',
 'title.report' => 'گزارش',
 'title.send_report' => 'ارسال گزارش',
+// TODO: Translate the following.
+// 'title.timesheets' => 'Timesheets',
+// 'title.timesheet' => 'Timesheet',
+// 'title.timesheet_files' => 'Timesheet Files',
 'title.invoice' => 'فاکتور',
 'title.send_invoice' => 'ارسال فاکتور',
 'title.charts' => 'نمودارها',
 'title.projects' => 'پروژه ها',
+// TODO: translate the following.
+// 'title.project_files' => 'Project Files',
 'title.add_project' => 'درج پروژه',
 'title.edit_project' => 'ویرایش پروژه',
 'title.delete_project' => 'حذف پروژه',
@@ -243,6 +326,11 @@ $i18n_key_words = array(
 'title.add_user' => 'درج کاربر',
 'title.edit_user' => 'ویرایش کاربر',
 'title.delete_user' => 'حذف کاربر',
+// TODO: translate the following.
+// 'title.roles' => 'Roles',
+// 'title.add_role' => 'Adding Role',
+// 'title.edit_role' => 'Editing Role',
+// 'title.delete_role' => 'Deleting Role',
 'title.clients' => 'مشتریان',
 'title.add_client' => 'درج مشتری',
 'title.edit_client' => 'ویرایش مشتری',
@@ -251,16 +339,22 @@ $i18n_key_words = array(
 'title.add_invoice' => 'درج فاکتور',
 'title.view_invoice' => 'نمایش فاکتور',
 'title.delete_invoice' => 'حذف فاکتور',
-// TODO: translate the following strings.
+// TODO: translate the following.
 // 'title.notifications' => 'Notifications',
 // 'title.add_notification' => 'Adding Notification',
 // 'title.edit_notification' => 'Editing Notification',
 // 'title.delete_notification' => 'Deleting Notification',
+// 'title.add_timesheet' => 'Adding Timesheet',
+// 'title.edit_timesheet' => 'Editing Timesheet',
+// 'title.delete_timesheet' => 'Deleting Timesheet',
 // 'title.monthly_quotas' => 'Monthly Quotas',
-'title.export' => 'پشتیانی گرفتن از اطلاعات تیم',
-'title.import' => 'وارد کردن اطلاعات تیم',
+'title.export' => 'پشتیانی گرفتن از اطلاعات تیم', // TODO: replace "team" with "group".
+'title.import' => 'وارد کردن اطلاعات تیم', // TODO: replace "team" with "group".
 'title.options' => 'گزینه ها',
+// TODO: translate the following.
+// 'title.display_options' => 'Display Options',
 'title.profile' => 'پروفایل',
+'title.plugins' => 'پلاگین ها',
 'title.cf_custom_fields' => 'فیلدهای سفارشی',
 'title.cf_add_custom_field' => 'درج فیلد سفارشی',
 'title.cf_edit_custom_field' => 'ویرایش فیلد سفارشی',
@@ -270,33 +364,64 @@ $i18n_key_words = array(
 'title.cf_edit_dropdown_option' => 'ویرایش گزینه',
 'title.cf_delete_dropdown_option' => 'حذف گزینه',
 // NOTE TO TRANSLATORS: Locking is a feature to lock records from modifications (ex: weekly on Mondays we lock all previous weeks).
-// It is also a name for the Locking plugin on the Team profile page.
-// TODO: Translate the following:
+// It is also a name for the Locking plugin on the group settings page.
+// TODO: translate the following.
 // 'title.locking' => 'Locking',
+// 'title.week_view' => 'Week View',
+// 'title.swap_roles' => 'Swapping Roles',
+// 'title.work_units' => 'Work Units',
+// 'title.templates' => 'Templates',
+// 'title.add_template' => 'Adding Template',
+// 'title.edit_template' => 'Editing Template',
+// 'title.delete_template' => 'Deleting Template',
+// 'title.edit_file' => 'Editing File',
+// 'title.delete_file' => 'Deleting File',
+// 'title.download_file' => 'Downloading File',
+// 'title.work' => 'Work',
+// 'title.add_work' => 'Adding Work',
+// 'title.edit_work' => 'Editing Work',
+// 'title.delete_work' => 'Deleting Work',
+// 'title.active_work' => 'Active Work', // Active work items this group outsources to other groups.
+// 'title.inactive_work' => 'Inactive Work', // Inactive work items this group was outsourcing to other groups.
 
 // Section for common strings inside combo boxes on forms. Strings shared between forms shall be placed here.
 // Strings that are used in a single form must go to the specific form section.
 'dropdown.all' => '--- همه ---',
 'dropdown.no' => '--- هیچکدام ---',
-// TODO: check translation of dropdown.this_day. It does not necessarily means "today". It means a specific ("this") day selected on calendar. See charts.php.
-// 'dropdown.this_day' => 'امروز',
-'dropdown.this_week' => 'هفته جاری',
-'dropdown.last_week' => 'هفته آخر',
-'dropdown.this_month' => 'ماه جاری',
-'dropdown.last_month' => 'ماه آخر',
-'dropdown.this_year' => 'سال جاری',
+// TODO: translate the following.
+// 'dropdown.current_day' => 'today',
+// 'dropdown.previous_day' => 'yesterday',
+// 'dropdown.selected_day' => 'day',
+'dropdown.current_week' => 'هفته جاری',
+'dropdown.previous_week' => 'هفته آخر',
+// TODO: translate the following.
+// 'dropdown.selected_week' => 'week',
+'dropdown.current_month' => 'ماه جاری',
+'dropdown.previous_month' => 'ماه آخر',
+// TODO: translate the following.
+// 'dropdown.selected_month' => 'month',
+'dropdown.current_year' => 'سال جاری',
+// TODO: translate the following.
+// 'dropdown.previous_year' => 'previous year',
+// 'dropdown.selected_year' => 'year',
 'dropdown.all_time' => 'همه زمان ها',
 'dropdown.projects' => 'پروژه ها',
 'dropdown.tasks' => 'وظایف',
 'dropdown.clients' => 'مشتریان',
-// TODO: translate the following string.
+// TODO: translate the following.
 // 'dropdown.select' => '--- select ---',
 'dropdown.select_invoice' => '--- انتخاب فاکتور ---',
+// TODO: translate the following.
+// 'dropdown.select_timesheet' => '--- select timesheet ---',
 'dropdown.status_active' => 'فعال',
 'dropdown.status_inactive' => 'غیرفعال',
-// TODO: translate the following strings.
-// 'dropdown.delete'=>'delete',
-// 'dropdown.do_not_delete'=>'do not delete',
+// TODO: translate the following.
+// 'dropdown.delete' => 'delete',
+// 'dropdown.do_not_delete' => 'do not delete',
+// 'dropdown.approved' => 'approved',
+// 'dropdown.not_approved' => 'not approved',
+// 'dropdown.paid' => 'paid',
+// 'dropdown.not_paid' => 'not paid',
 
 // Below is a section for strings that are used on individual forms. When a string is used only on one form it should be placed here.
 // One exception is for closely related forms such as "Time" and "Editing Time Record" with similar controls. In such cases
@@ -306,14 +431,17 @@ $i18n_key_words = array(
 // Login form. See example at https://timetracker.anuko.com/login.php.
 'form.login.forgot_password' => 'بازیابی رمز عبور؟',
 // TODO: translate form.login.about.
-'form.login.about' =>'Anuko <a href="https://www.anuko.com/lp/tt_2.htm" target="_blank">Time Tracker</a> is a simple, easy to use, open source time tracking system.',
+'form.login.about' => 'Anuko <a href="https://www.anuko.com/lp/tt_2.htm" target="_blank">Time Tracker</a> is a simple, easy to use, open source time tracking system.',
 
 // Resetting Password form. See example at https://timetracker.anuko.com/password_reset.php.
 'form.reset_password.message' => 'درخواست بازیابی رمزعبور به ایمیل فرستاده شد.',
 // TODO: check translation of form.reset_password.email_subject. This is the subject for email message for password reset. Below is the English original.
 // 'form.reset_password.email_subject' => 'Anuko Time Tracker password reset request',
 'form.reset_password.email_subject' => 'درخواست بازیابی رمزعبور فرستاده شد',
-'form.reset_password.email_body' => "کاربران گرامی\n\n یک نفر، شاید خودتان، درخواست بازیابی رمزعبور نرم افزار رهگیری زمان شما را داشته است.لطفا برای تغییر رمزعبور روی لینک زیر کلیک کنید: \n\n%s\n\n",
+// TODO: English string has changed. "from IP added. Re-translate the beginning.
+// 'form.reset_password.email_body' => "Dear User,\n\nSomeone from IP %s requested your Anuko Time Tracker password reset. Please visit this link if you want to reset your password.\n\n%s\n\nAnuko Time Tracker is a simple, easy to use, open source time tracking system. Visit https://www.anuko.com for more information.\n\n",
+// Older translation is below.
+// 'form.reset_password.email_body' => "کاربران گرامی\n\n یک نفر، شاید خودتان، درخواست بازیابی رمزعبور نرم افزار رهگیری زمان شما را داشته است.لطفا برای تغییر رمزعبور روی لینک زیر کلیک کنید: \n\n%s\n\n",
 
 // Changing Password form. See example at https://timetracker.anuko.com/password_change.php?ref=1.
 'form.change_password.tip' => 'رمز عبور جدید را وارد کنید سپس روی ذخیره کلیک کنید',
@@ -325,17 +453,28 @@ $i18n_key_words = array(
 // TODO: translate the following.
 // 'form.time.remaining_quota' => 'Remaining quota',
 // 'form.time.over_quota' => 'Over quota',
+// 'form.time.remaining_balance' => 'Remaining balance',
+// 'form.time.over_balance' => 'Over balance',
 
 // Editing Time Record form. See example at https://timetracker.anuko.com/time_edit.php (get there by editing an uncompleted time record).
 // TODO: translate form.time_edit.uncompleted. 
 'form.time_edit.uncompleted' => 'This record was saved with only start time. It is not an error.',
 
+// Week view form. See example at https://timetracker.anuko.com/week.php.
+// TODO: translate the following.
+// 'form.week.new_entry' => 'New entry',
+
 // Reports form. See example at https://timetracker.anuko.com/reports.php
 'form.reports.save_as_favorite' => 'ذخیره به عنوان برگزیده',
 'form.reports.confirm_delete' => 'آیا می خواهید گزارش برگزیده حذف شود؟',
-'form.reports.include_records' => 'شامل رکوردهای',
 'form.reports.include_billable' => 'قابل پرداخت',
 'form.reports.include_not_billable' => 'غیرقابل پرداخت',
+// TODO: translate the following.
+// 'form.reports.include_invoiced' => 'invoiced',
+// 'form.reports.include_not_invoiced' => 'not invoiced',
+// 'form.reports.include_assigned' => 'assigned',
+// 'form.reports.include_not_assigned' => 'not assigned',
+// 'form.reports.include_pending' => 'pending',
 'form.reports.select_period' => 'انتخاب بازه زمانی',
 'form.reports.set_period' => 'یا تعیین تاریخ',
 'form.reports.show_fields' => 'نمایش فیلدها',
@@ -346,21 +485,34 @@ $i18n_key_words = array(
 'form.reports.group_by_client' => 'مشتری',
 'form.reports.group_by_project' => 'پروژه',
 'form.reports.group_by_task' => 'وظیفه',
-// TODO: translate form.reports.totals_only. Selecting this option means to print subtotals only for a "grouped by" report.
-// In other words, items are not printed, only subtotals for grouped items are printed.  
-'form.reports.totals_only' => 'Totals only',
 
 // Report form. See example at https://timetracker.anuko.com/report.php
 // (after generating a report at https://timetracker.anuko.com/reports.php).
 'form.report.export' => 'پشتیبانی',
+// TODO: translate the following.
+// 'form.report.assign_to_invoice' => 'Assign to invoice',
+// 'form.report.assign_to_timesheet' => 'Assign to timesheet',
+
+// Timesheets form. See example at https://timetracker.anuko.com/timesheets.php
+// TODO: translate the following.
+// 'form.timesheets.active_timesheets' => 'Active Timesheets',
+// 'form.timesheets.inactive_timesheets' => 'Inactive Timesheets',
+
+// Templates form. See example at https://timetracker.anuko.com/templates.php
+// TODO: translate the following.
+// 'form.templates.active_templates' => 'Active Templates',
+// 'form.templates.inactive_templates' => 'Inactive Templates',
 
 // Invoice form. See example at https://timetracker.anuko.com/invoice.php
 // (you can get to this form after generating a report).
 'form.invoice.number' => 'شماره فاکتور',
 'form.invoice.person' => 'شخص',
+
+// Deleting Invoice form. See example at https://timetracker.anuko.com/invoice_delete.php
 // TODO: translate the following stings.
 // 'form.invoice.invoice_to_delete' => 'Invoice to delete',
 // 'form.invoice.invoice_entries' => 'Invoice entries',
+// 'form.invoice.confirm_deleting_entries' => 'Please confirm deleting invoice entries from Time Tracker.',
 
 // Charts form. See example at https://timetracker.anuko.com/charts.php
 'form.charts.interval' => 'بازه',
@@ -375,8 +527,6 @@ $i18n_key_words = array(
 'form.tasks.inactive_tasks' => 'وظایف غیرفعال',
 
 // Users form. See example at https://timetracker.anuko.com/users.php
-'form.users.active_users' => 'کاربران فعال',
-'form.users.inactive_users' => 'کاربران غیرفعال',
  // TODO: translate the following.
  // 'form.users.uncompleted_entry' => 'User has an uncompleted time entry',
 'form.users.role' => 'سمت',
@@ -385,59 +535,132 @@ $i18n_key_words = array(
 'form.users.rate' => 'نرخ',
 'form.users.default_rate' => 'نرخ ساعتی پیش فرض',
 
-// Client delete form. See example at https://timetracker.anuko.com/client_delete.php
-// TODO: translate the following strings.
-// 'form.client.client_to_delete' => 'Client to delete',
-// 'form.client.client_entries' => 'Client entries',
+// Editing User form. See example at https://timetracker.anuko.com/user_edit.php
+// TODO: translate the following.
+// 'form.user_edit.swap_roles' => 'Swap roles',
+
+// Roles form. See example at https://timetracker.anuko.com/roles.php
+// TODO: translate the following.
+// 'form.roles.active_roles' => 'Active Roles',
+// 'form.roles.inactive_roles' => 'Inactive Roles',
+// 'form.roles.rank' => 'Rank',
+// 'form.roles.rights' => 'Rights',
+// 'form.roles.assigned' => 'Assigned',
+// 'form.roles.not_assigned' => 'Not assigned',
 
 // Clients form. See example at https://timetracker.anuko.com/clients.php
 'form.clients.active_clients' => 'مشتری های فعال',
 'form.clients.inactive_clients' => 'مشتری های غیرفعال',
 
-// Strings for Exporting Team Data form. See example at https://timetracker.anuko.com/export.php
+// Deleting Client form. See example at https://timetracker.anuko.com/client_delete.php
+// TODO: translate the following.
+// 'form.client.client_to_delete' => 'Client to delete',
+// 'form.client.client_entries' => 'Client entries',
+
+// Exporting Group Data form. See example at https://timetracker.anuko.com/export.php
+// TODO: replace "team" with "group" in the string below.
 'form.export.hint' => 'می توانید از همه اطلاعات تیم یک پشتیبان به فرمت xml تهیه کنید. اگر میخواهید داده ها را به سرور خودتان منتقل کنید این قسمت می تواند مفید باشد.',
 'form.export.compression' => 'فشرده سازی',
 'form.export.compression_none' => 'هیچ کدام',
 'form.export.compression_bzip' => 'bzip',
 
-// Strings for Importing Team Data form. See example at https://timetracker.anuko.com/imort.php (login as admin first).
-'form.import.hint' => 'وارد کردن اطلاعات تیم از یک فایل xml',
+// Importing Group Data form. See example at https://timetracker.anuko.com/import.php (login as admin first).
+'form.import.hint' => 'وارد کردن اطلاعات تیم از یک فایل xml', // TODO: replace "team" with "group".
 'form.import.file' => 'انتخاب فایل',
 'form.import.success' => 'وارد کردن اطلاعات با موفقیت انجام شد',
 
-// Teams form. See example at https://timetracker.anuko.com/admin_teams.php (login as admin first).
-// TODO: translate form.teams.hint.
-'form.teams.hint' =>  'Create a new team by creating a new team manager account.<br>You can also import team data from an xml file from another Anuko Time Tracker server (no login collisions are allowed).',
+// Groups form. See example at https://timetracker.anuko.com/admin_groups.php (login as admin first).
+// TODO: translate form.groups.hint.
+// 'form.groups.hint' => 'Create a new group by creating a new group manager account.<br>You can also import group data from an xml file from another Anuko Time Tracker server (no login collisions are allowed).',
 
-// Profile form. See example at https://timetracker.anuko.com/profile_edit.php.
-'form.profile.12_hours' => '12 ساعت',
-'form.profile.24_hours' => '24 ساعت',
-'form.profile.tracking_mode' => 'حالت رهگیری',
-'form.profile.mode_time' => 'زمان',
-'form.profile.mode_projects' => 'پروژه ها',
-'form.profile.mode_projects_and_tasks' => 'پروژه ها و وظایف',
-'form.profile.record_type' => 'نوع رکورد',
-'form.profile.type_all' => 'همه',
-'form.profile.type_start_finish' => 'شروع و اتمام',
-'form.profile.type_duration' => 'مدت زمان',
-'form.profile.plugins' => 'پلاگین ها',
+// Group Settings form. See example at https://timetracker.anuko.com/group_edit.php.
+'form.group_edit.12_hours' => '12 ساعت',
+'form.group_edit.24_hours' => '24 ساعت',
+// TODO: translate the following.
+// 'form.group_edit.display_options' => 'Display options',
+// 'form.group_edit.holidays' => 'Holidays',
+'form.group_edit.tracking_mode' => 'حالت رهگیری',
+'form.group_edit.mode_time' => 'زمان',
+'form.group_edit.mode_projects' => 'پروژه ها',
+'form.group_edit.mode_projects_and_tasks' => 'پروژه ها و وظایف',
+'form.group_edit.record_type' => 'نوع رکورد',
+'form.group_edit.type_all' => 'همه',
+'form.group_edit.type_start_finish' => 'شروع و اتمام',
+'form.group_edit.type_duration' => 'مدت زمان',
+// TODO: translate the following.
+// 'form.group_edit.punch_mode' => 'Punch mode',
+// 'form.group_edit.allow_overlap' => 'Allow overlap',
+// 'form.group_edit.future_entries' => 'Future entries',
+// 'form.group_edit.uncompleted_indicators' => 'Uncompleted indicators',
+// 'form.group_edit.confirm_save' => 'Confirm saving',
+// 'form.group_edit.allow_ip' => 'Allow IP',
+// 'form.group_edit.advanced_settings' => 'Advanced settings',
+
+// Deleting Group form. See example at https://timetracker.anuko.com/delete_group.php
+// TODO: translate the following.
+// 'form.group_delete.hint' => 'Are you sure you want to delete the entire group?',
 
 // Mail form. See example at https://timetracker.anuko.com/report_send.php when emailing a report.
 'form.mail.from' => 'از',
 'form.mail.to' => 'به',
-'form.mail.cc' => 'کپی',
-'form.mail.subject' => 'موضوع',
 'form.mail.report_subject' => 'گزارش تایم شیت',
 // TODO: translate form.mail.footer.
 // 'form.mail.footer' => 'Anuko Time Tracker is a simple, easy to use, open source<br>time tracking system. Visit <a href="https://www.anuko.com">www.anuko.com</a> for more information.',
 'form.mail.report_sent' => 'گزارش ارسال شد.',
 'form.mail.invoice_sent' => 'فاکتور ارسال شد.',
 
-// Quotas configuration form.
+// Quotas configuration form. See example at https://timetracker.anuko.com/quotas.php after enabling Monthly quotas plugin.
 // TODO: translate the following.
 // 'form.quota.year' => 'Year',
 // 'form.quota.month' => 'Month',
-// 'form.quota.quota' => 'Quota',
 // 'form.quota.workday_hours' => 'Hours in a work day',
 // 'form.quota.hint' => 'If values are empty, quotas are calculated automatically based on workday hours and holidays.',
+
+// Swap roles form. See example at https://timetracker.anuko.com/swap_roles.php.
+// TODO: translate the following.
+// 'form.swap.hint' => 'Demote yourself to a lower role by swapping roles with someone else. This cannot be undone.',
+// 'form.swap.swap_with' => 'Swap roles with',
+
+// Work Units configuration form. See example at https://timetracker.anuko.com/work_units.php after enabling Work units plugin.
+// TODO: translate the following.
+// 'form.work_units.minutes_in_unit' => 'Minutes in unit',
+// 'form.work_units.1st_unit_threshold' => '1st unit threshold',
+
+// Roles and rights. These strings are used in multiple places. Grouped here to provide consistent translations.
+// TODO: translate the following.
+// 'role.user.label' => 'User',
+// 'role.user.low_case_label' => 'user',
+// 'role.user.description' => 'A regular member without management rights.',
+// 'role.client.label' => 'Client',
+// 'role.client.low_case_label' => 'client',
+// 'role.client.description' => 'A client can view its own data.',
+// 'role.supervisor.label' => 'Supervisor',
+// 'role.supervisor.low_case_label' => 'supervisor',
+// 'role.supervisor.description' => 'A person with a small set of management rights.',
+// 'role.comanager.label' => 'Co-manager',
+// 'role.comanager.low_case_label' => 'co-manager',
+// 'role.comanager.description' => 'A person with a big set of management functions.',
+// 'role.manager.label' => 'Manager',
+// 'role.manager.low_case_label' => 'manager',
+// 'role.manager.description' => 'Group manager. Can do most of things for a group.',
+// 'role.top_manager.label' => 'Top manager',
+// 'role.top_manager.low_case_label' => 'top manager',
+// 'role.top_manager.description' => 'Top group manager. Can do everything in a tree of groups.',
+// 'role.admin.label' => 'Administrator',
+// 'role.admin.low_case_label' => 'administrator',
+// 'role.admin.description' => 'Site adminsitrator.',
+
+// Timesheet View form. See example at https://timetracker.anuko.com/timesheet_view.php.
+// TODO: translate the following.
+// 'form.timesheet_view.submit_subject' => 'Timesheet approval request',
+// 'form.timesheet_view.submit_body' => "A new timesheet requires approval.<p>User: %s.",
+// 'form.timesheet_view.approve_subject' => 'Timesheet approved',
+// 'form.timesheet_view.approve_body' => "Your timesheet %s was approved.<p>%s",
+// 'form.timesheet_view.disapprove_subject' => 'Timesheet not approved',
+// 'form.timesheet_view.disapprove_body' => "Your timesheet %s was not approved.<p>%s",
+
+// Display Options form. See example at https://timetracker.anuko.com/display_options.php.
+// TODO: translate the following.
+// 'form.display_options.menu' => 'Menu',
+// 'form.display_options.note_on_separate_row' => 'Note on separate row',
 );

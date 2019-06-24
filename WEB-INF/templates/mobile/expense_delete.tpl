@@ -8,17 +8,17 @@
     <td class="tableHeader" align="center">{$i18n.label.client}</td>
 {/if}
 
-{if ($smarty.const.MODE_PROJECTS == $user->tracking_mode || $smarty.const.MODE_PROJECTS_AND_TASKS == $user->tracking_mode)}
+{if $show_project}
     <td class="tableHeader" align="center">{$i18n.label.project}</td>
 {/if}
     <td class="tableHeader" align="center">{$i18n.label.item}</td>
     <td class="tableHeader" align="center">{$i18n.label.cost}</td>
   </tr>
-  <tr bgcolor="{cycle values="#f5f5f5,#ccccce"}">
+  <tr>
 {if $user->isPluginEnabled('cl')}
-  <td>{$expense_item.client_name|escape}</td>
+    <td>{$expense_item.client_name|escape}</td>
 {/if}
-{if ($smarty.const.MODE_PROJECTS == $user->tracking_mode || $smarty.const.MODE_PROJECTS_AND_TASKS == $user->tracking_mode)}
+{if $show_project}
     <td>{$expense_item.project_name|escape}</td>
 {/if}
     <td>{$expense_item.name|escape}</td>

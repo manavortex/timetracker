@@ -28,17 +28,22 @@
 
 require_once('initialize.php');
 import('form.Form');
-import('ttTeamHelper');
+import('ttGroupHelper');
 
-// Access check.
-if (!ttAccessCheck(right_view_invoices) || !$user->isPluginEnabled('iv')) {
+// Access checks.
+if (!(ttAccessAllowed('manage_invoices') || ttAccessAllowed('view_client_invoices'))) {
   header('Location: access_denied.php');
   exit();
 }
+if (!$user->isPluginEnabled('iv')) {
+  header('Location: feature_disabled.php');
+  exit();
+}
+// End of access checks.
 
-$invoices = ttTeamHelper::getActiveInvoices();
+$invoices = ttGroupHelper::getActiveInvoices();
 
 $smarty->assign('invoices', $invoices);
-$smarty->assign('title', $i18n->getKey('title.invoices'));
+$smarty->assign('title', $i18n->get('title.invoices'));
 $smarty->assign('content_page_name', 'invoices.tpl');
 $smarty->display('index.tpl');

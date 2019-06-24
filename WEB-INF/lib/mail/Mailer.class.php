@@ -33,6 +33,7 @@ class Mailer {
   var $mSender;
   var $mReceiver;
   var $mReceiverCC;
+  var $mReceiverBCC;
 
   function __construct($type='mail') {
     $this->mMailMode = $type;
@@ -58,6 +59,10 @@ class Mailer {
     $this->mReceiverCC = $value;
   }
 
+  function setReceiverBCC($value) {
+    $this->mReceiverBCC = $value;
+  }
+
   function setSender($value) {
     $this->mSender = $value;
   }
@@ -68,6 +73,7 @@ class Mailer {
 
     $headers = array('From' => $this->mSender, 'To' => $this->mReceiver);
     if (isset($this->mReceiverCC)) $headers = array_merge($headers, array('CC' => $this->mReceiverCC));
+    if (isset($this->mReceiverBCC)) $headers = array_merge($headers, array('BCC' => $this->mReceiverBCC));
     $headers = array_merge($headers, array(
       'Subject' => $subject,
       'MIME-Version' => '1.0',
@@ -84,18 +90,22 @@ class Mailer {
         break;
 
     case 'smtp':
-        // Mail_smtp does not do CC -> recipients conversion
+        // Mail_smtp does not do CC or BCC -> recipients conversion.
         if (!empty($this->mReceiverCC)) {
           // make exactly one space after a comma
           $recipients .= ', ' . preg_replace('/,[[:space:]]+/', ', ', $this->mReceiverCC);
+        }
+        if (!empty($this->mReceiverBCC)) {
+          // make exactly one space after a comma
+          $recipients .= ', ' . preg_replace('/,[[:space:]]+/', ', ', $this->mReceiverBCC);
         }
 
         $host = defined('MAIL_SMTP_HOST') ? MAIL_SMTP_HOST : 'localhost';
         $port = defined('MAIL_SMTP_PORT') ? MAIL_SMTP_PORT : '25';
         $username = defined('MAIL_SMTP_USER') ? MAIL_SMTP_USER : null;
         $password = defined('MAIL_SMTP_PASSWORD') ? MAIL_SMTP_PASSWORD : null;
-        $auth = (defined('MAIL_SMTP_AUTH') && isTrue(MAIL_SMTP_AUTH)) ? true : false;
-        $debug = (defined('MAIL_SMTP_DEBUG') && isTrue(MAIL_SMTP_DEBUG)) ? true : false;
+        $auth = isTrue('MAIL_SMTP_AUTH');
+        $debug = isTrue('MAIL_SMTP_DEBUG');
 
         $mail = Mail::factory('smtp', array ('host' => $host,
           'port' => $port,
@@ -106,7 +116,7 @@ class Mailer {
         break;
     }
 
-    if (defined('MAIL_SMTP_DEBUG') && isTrue(MAIL_SMTP_DEBUG))
+    if (isTrue('MAIL_SMTP_DEBUG'))
       PEAR::setErrorHandling(PEAR_ERROR_PRINT);
 
     $res = $mail->send($recipients, $headers, $data);

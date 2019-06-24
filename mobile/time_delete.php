@@ -32,17 +32,19 @@ import('ttUserHelper');
 import('ttTimeHelper');
 import('DateAndTime');
 
-// Access check.
-if (!ttAccessCheck(right_data_entry)) {
+// Access checks.
+if (!ttAccessAllowed('track_own_time')) {
   header('Location: access_denied.php');
   exit();
 }
-
-$cl_id = $request->getParameter('id');
-$time_rec = ttTimeHelper::getRecord($cl_id, $user->getActiveUser());
-
-// Prohibit deleting invoiced records.
-if ($time_rec['invoice_id']) die($i18n->getKey('error.sys'));
+$cl_id = (int)$request->getParameter('id');
+$time_rec = ttTimeHelper::getRecord($cl_id);
+if (!$time_rec || $time_rec['approved'] || $time_rec['timesheet_id'] || $time_rec['invoice_id']) {
+  // Prohibit deleting not ours, approved, assigned to timesheet, or invoiced records.
+  header('Location: access_denied.php');
+  exit();
+}
+// End of access checks.
 
 // Escape comment for presentation.
 $time_rec['comment'] = htmlspecialchars($time_rec['comment']);
@@ -57,18 +59,15 @@ if ($request->isPost()) {
     $uncompleted = ($time_rec['duration'] == '0:00');
 
     if ($user->isDateLocked($item_date) && !$uncompleted)
-      $err->add($i18n->getKey('error.range_locked'));
+      $err->add($i18n->get('error.range_locked'));
 
     if ($err->no()) {
-
       // Delete the record.
-      $result = ttTimeHelper::delete($cl_id, $user->getActiveUser());
-
-      if ($result) {
+      if (ttTimeHelper::delete($cl_id)) {
         header('Location: time.php');
         exit();
       } else {
-        $err->add($i18n->getKey('error.db'));
+        $err->add($i18n->get('error.db'));
       }
     }
   }
@@ -80,10 +79,10 @@ if ($request->isPost()) {
 
 $form = new Form('timeRecordForm');
 $form->addInput(array('type'=>'hidden','name'=>'id','value'=>$cl_id));
-$form->addInput(array('type'=>'submit','name'=>'delete_button','value'=>$i18n->getKey('label.delete')));
-$form->addInput(array('type'=>'submit','name'=>'cancel_button','value'=>$i18n->getKey('button.cancel')));
+$form->addInput(array('type'=>'submit','name'=>'delete_button','value'=>$i18n->get('label.delete')));
+$form->addInput(array('type'=>'submit','name'=>'cancel_button','value'=>$i18n->get('button.cancel')));
 $smarty->assign('time_rec', $time_rec);
 $smarty->assign('forms', array($form->getName() => $form->toArray()));
-$smarty->assign('title', $i18n->getKey('title.delete_time_record'));
+$smarty->assign('title', $i18n->get('title.delete_time_record'));
 $smarty->assign('content_page_name', 'mobile/time_delete.tpl');
 $smarty->display('mobile/index.tpl');

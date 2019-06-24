@@ -36,7 +36,7 @@
             <table cellspacing="0" cellpadding="0" width="{$tab_width}" border="0">
               <tr>
                 <td valign="top">
-                  <table cellspacing="0" cellpadding="0" width="100%" border="0">
+                  <table id="page_logo" cellspacing="0" cellpadding="0" width="100%" border="0">
                     <tr><td height="6" colspan="2"><img width="1" height="6" src="../images/1x1.gif" border="0"></td></tr>
                     <tr valign="top">
 {if $user->custom_logo}
@@ -55,13 +55,13 @@
       <!-- end of top image -->
       
 {if $authenticated}
-  {if $user->isAdmin()}
+  {if $user->can('administer_site')}
   
       <!-- sub menu for admin -->
-      <table cellspacing="0" cellpadding="3" width="100%" border="0">
+      <table id="sub_menu_admin" cellspacing="0" cellpadding="3" width="100%" border="0">
         <tr>
           <td align="center" bgcolor="#d9d9d9" height="17" style="background-repeat: repeat-x;" background="../images/subm_bg.gif">&nbsp;
-            <a class="mainMenu" href="admin_teams.php">{$i18n.menu.teams}</a> &middot;
+            <a class="mainMenu" href="admin_groups.php">{$i18n.menu.groups}</a>
             <a class="mainMenu" href="admin_options.php">{$i18n.menu.options}</a>
           </td>
         </tr>
@@ -70,26 +70,26 @@
   {else}
 
       <!-- sub menu for authorized user -->
-      <table cellspacing="0" cellpadding="3" width="100%" border="0">
+      <table id="sub_menu_authorized_user" cellspacing="0" cellpadding="3" width="100%" border="0">
         <tr>
           <td align="center" bgcolor="#d9d9d9" height="17" style="background-repeat: repeat-x;" background="../images/subm_bg.gif">&nbsp;
-    {if !$user->isClient()}
+    {if $user->exists() && ($user->can('track_own_time') || $user->can('track_time'))}
            <a class="mainMenu" href="time.php">{$i18n.menu.time}</a>
     {/if}
-    {if $user->isPluginEnabled('ex') && !$user->isClient()}
-            &middot; <a class="mainMenu" href="expenses.php">{$i18n.menu.expenses}</a>
+    {if $user->exists() && $user->isPluginEnabled('ex') && ($user->can('track_own_expenses') || $user->can('track_expenses'))}
+           <a class="mainMenu" href="expenses.php">{$i18n.menu.expenses}</a>
     {/if}
-    {if !$user->isClient() && ($smarty.const.MODE_PROJECTS == $user->tracking_mode || $smarty.const.MODE_PROJECTS_AND_TASKS == $user->tracking_mode)}
-            &middot; <a class="mainMenu" href="projects.php">{$i18n.menu.projects}</a>
+    {if ($user->can('view_own_projects') || $user->can('manage_projects')) && ($smarty.const.MODE_PROJECTS == $user->getTrackingMode() || $smarty.const.MODE_PROJECTS_AND_TASKS == $user->getTrackingMode())}
+           <a class="mainMenu" href="projects.php">{$i18n.menu.projects}</a>
     {/if}
-    {if $user->canManageTeam() && ($smarty.const.MODE_PROJECTS_AND_TASKS == $user->tracking_mode)}
-            &middot; <a class="mainMenu" href="tasks.php">{$i18n.menu.tasks}</a>
+    {if ($user->can('view_own_tasks') || $user->can('manage_tasks')) && $smarty.const.MODE_PROJECTS_AND_TASKS == $user->getTrackingMode()}
+           <a class="mainMenu" href="tasks.php">{$i18n.menu.tasks}</a>
     {/if}
-    {if !$user->isClient()}
-            &middot; <a class="mainMenu" href="users.php">{$i18n.menu.users}</a>
+    {if $user->can('view_users') || $user->can('manage_users')}
+           <a class="mainMenu" href="users.php">{$i18n.menu.users}</a>
     {/if}
-    {if $user->canManageTeam() && $user->isPluginEnabled('cl')}
-            &middot; <a class="mainMenu" href="clients.php">{$i18n.menu.clients}</a>
+    {if $user->isPluginEnabled('cl') && ($user->can('view_own_clients') || $user->can('manage_clients'))}
+           <a class="mainMenu" href="clients.php">{$i18n.menu.clients}</a>
     {/if}
           </td>
         </tr>
@@ -100,7 +100,7 @@
       
       <!-- output errors -->
 {if $err->yes()}
-      <table cellspacing="4" cellpadding="7" width="{$tab_width}" border="0">
+      <table id="page_errors" cellspacing="4" cellpadding="7" width="{$tab_width}" border="0">
         <tr>
           <td class="error">
   {foreach $err->getErrors() as $error}
@@ -114,7 +114,7 @@
 
       <!-- output messages -->
 {if $msg->yes()}
-      <table cellspacing="4" cellpadding="7" width="{$tab_width}" border="0">
+      <table id="page_messages" cellspacing="4" cellpadding="7" width="{$tab_width}" border="0">
         <tr>
           <td class="info_message">
   {foreach $msg->getErrors() as $message}

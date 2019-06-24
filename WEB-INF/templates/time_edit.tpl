@@ -1,5 +1,19 @@
 {include file="time_script.tpl"}
 
+{* Conditional include of confirmSave handler. *}
+{if $confirm_save}
+<script>
+var original_date = "{$entry_date}";
+
+function confirmSave() {
+  var date_on_save = document.getElementById("date").value;
+  if (original_date != date_on_save) {
+    return confirm("{$i18n.warn.confirm_save}");
+  }
+}
+</script>
+{/if}
+
 {$forms.timeRecordForm.open}
 <table cellspacing="4" cellpadding="7" border="0">
 <tr>
@@ -10,7 +24,7 @@
     <table border="0">
 {if $user->isPluginEnabled('cl')}
     <tr>
-      <td align="right">{$i18n.label.client}{if $user->isPluginEnabled('cm')} (*){/if}:</td>
+      <td align="right">{$i18n.label.client}{if $user->isOptionEnabled('client_required')} (*){/if}:</td>
       <td>{$forms.timeRecordForm.client.control}</td>
     </tr>
 {/if}
@@ -18,6 +32,12 @@
     <tr>
       <td align="right">&nbsp;</td>
       <td><label>{$forms.timeRecordForm.billable.control}{$i18n.form.time.billable}</label></td>
+    </tr>
+{/if}
+{if ($user->can('manage_invoices') && $user->isPluginEnabled('ps'))}
+    <tr>
+      <td align="right">&nbsp;</td>
+      <td><label>{$forms.timeRecordForm.paid.control}{$i18n.label.paid}</label></td>
     </tr>
 {/if}
 {if ($custom_fields && $custom_fields->fields[0])} 
@@ -33,7 +53,7 @@
 {/if}
 {if ($smarty.const.MODE_PROJECTS_AND_TASKS == $user->tracking_mode)}
     <tr>
-      <td align="right">{$i18n.label.task}:</td>
+      <td align="right">{$i18n.label.task}{if $user->task_required} (*){/if}:</td>
       <td>{$forms.timeRecordForm.task.control}</td>
     </tr>
 {/if}
@@ -48,16 +68,21 @@
     </tr>
 {/if}
 {if (($smarty.const.TYPE_DURATION == $user->record_type) || ($smarty.const.TYPE_ALL == $user->record_type))}
-{*     <tr>
+    <tr>
       <td align="right">{$i18n.label.duration}:</td>
-      <td>{$forms.timeRecordForm.duration.control}</td>
+      <td>{$forms.timeRecordForm.duration.control}&nbsp;{if $user->decimal_mark == ','}{str_replace('.', ',', $i18n.form.time.duration_format)}{else}{$i18n.form.time.duration_format}{/if}</td>
     </tr>
-*}
 {/if}
     <tr>
       <td align="right">{$i18n.label.date}:</td>
       <td>{$forms.timeRecordForm.date.control}</td>
     </tr>
+{if $template_dropdown}
+    <tr>
+      <td align="right">{$i18n.label.template}:</td>
+      <td>{$forms.timeRecordForm.template.control}</td>
+    </tr>
+{/if}
     <tr>
       <td align="right">{$i18n.label.note}:</td>
       <td>{$forms.timeRecordForm.note.control}</td>

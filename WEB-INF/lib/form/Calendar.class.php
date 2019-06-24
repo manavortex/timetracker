@@ -34,7 +34,7 @@ class Calendar extends FormElement {
   var $showHolidays = true;
   var $weekStartDay = 0;
   
-    var $mHeader = "padding: 5px; font-size: 8pt; color: #333333;";
+    var $mHeader = "padding: 5px; font-size: 8pt; color: #333333; background-color: #d9d9d9;";
     var $mDayCell = "padding: 5px; border: 1px solid silver; font-size: 8pt; color: #333333; background-color: #ffffff;";
     var $mDaySelected = "padding: 5px; border: 1px solid silver; font-size: 8pt; color: #666666; background-color: #a6ccf7;";
     var $mDayWeekend = "padding: 5px; border: 1px solid silver; font-size: 8pt; color: #666666; background-color: #f7f7f7;";
@@ -57,18 +57,13 @@ class Calendar extends FormElement {
     	  $this->highlight = $highlight;
     }
 
-    function localize($i18n) {
+    function localize() {
       global $user;
+      global $i18n;
       
       $this->mMonthNames = $i18n->monthNames;
       $this->mWeekDayShortNames = $i18n->weekdayShortNames;
-      if (is_array($i18n->holidays)) {
-        foreach ($i18n->holidays as $fday) {
-          $date_a = explode("/",$fday); // format mm/dd
-          $this->holidays[] = mktime(0,0,0, $date_a[0], $date_a[1], date("Y"));// + 7200;
-        }
-      }
-      $this->weekStartDay = $user->week_start;
+      $this->weekStartDay = $user->getWeekStart();
     }
 
     function setStyle($style) { $this->style = $style; }
@@ -131,6 +126,8 @@ class Calendar extends FormElement {
 
       $str .= "<tr>";
 
+      // TODO: refactor this entire class, as $weekend_start and $weekend_end
+      // are not what their names suggest (debug with non zero week start to see it).
       $weekend_start = 6 - $this->weekStartDay;      // Saturday by default.
       $weekend_end = (7 - $this->weekStartDay) % 7;  // Sunday by default.
       if (defined('WEEKEND_START_DAY')) {
@@ -170,14 +167,11 @@ class Calendar extends FormElement {
               $stl_cell = ' class="CalendarDay"';
             }
 
-              // holidays
-              if ($this->showHolidays) {
-              foreach ($this->holidays as $day) {
-                if($day == $date) {
-                  $stl_cell = ' class="CalendarDayHoliday"';
-                  $stl_link = ' class="CalendarLinkHoliday"';
-                }
-              }
+            // holidays
+            $date_to_check = ttTimeHelper::dateInDatabaseFormat($thisyear, $thismonth, $start_date+$j);
+            if (ttTimeHelper::isHoliday($date_to_check)) {
+              $stl_cell = ' class="CalendarDayHoliday"';
+              $stl_link = ' class="CalendarLinkHoliday"';
             }
 
             // selected day
@@ -204,7 +198,7 @@ class Calendar extends FormElement {
         $str .= "</TR>\n";
       }
 
-      $str .= "<tr><td id='tdLinkToday' colspan=\"7\" align=\"center\"><a class='btn' id=\"today_link\" href=\"?".$this->controlName."=".strftime(DB_DATEFORMAT)."\" tabindex=\"-1\">".$i18n->getKey('label.today')."</a></td></tr>\n";
+      $str .= "<tr><td colspan=\"7\" align=\"center\"><a id=\"today_link\" href=\"?".$this->controlName."=".strftime(DB_DATEFORMAT)."\" tabindex=\"-1\">".$i18n->get('label.today')."</a></td></tr>\n";
       $str .= "</table>\n";
 
       $str .= "<input type=\"hidden\" name=\"$this->controlName\" value=\"$indate\">\n";
@@ -257,7 +251,7 @@ class Calendar extends FormElement {
     function _getActiveDates($start, $end) {
       
       global $user;
-      $user_id = $user->getActiveUser();
+      $user_id = $user->getUser();
       
       $table = ($this->highlight == 'expenses') ? 'tt_expense_items' : 'tt_log';
       

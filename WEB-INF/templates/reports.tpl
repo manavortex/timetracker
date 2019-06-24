@@ -1,4 +1,28 @@
 <script>
+// We need a few arrays to populate project dropdown.
+// When client selection changes, the project dropdown must be re-populated with only relevant projects.
+// Format:
+// project_ids[143] = "325,370,390,400";  // Comma-separated list of project ids for client.
+// project_names[325] = "Time Tracker";   // Project name.
+
+// Prepare an array of project ids for clients.
+var project_ids = new Array();
+{foreach $client_list as $client}
+  project_ids[{$client.id}] = "{$client.projects}";
+{/foreach}
+// Prepare an array of project names.
+var project_names = new Array();
+{foreach $project_list as $project}
+  project_names[{$project.id}] = "{$project.name|escape:'javascript'}";
+{/foreach}
+// We'll use this array to populate project dropdown when client is not selected.
+var idx = 0;
+var projects = new Array();
+{foreach $project_list as $project}
+  projects[idx] = new Array("{$project.id}", "{$project.name|escape:'javascript'}");
+  idx++;
+{/foreach}
+
 // We need a couple of array-like objects, one for associated task ids, another for task names.
 // For performance, and because associated arrays are frowned upon in JavaScript, we'll use a simple object
 // with properties for project tasks. Format:
@@ -27,8 +51,7 @@ var idx = 0;
   idx++;
 {/foreach}
 
-
-// empty_label is the mandatory top option in the tasks dropdown.
+// empty_label is the mandatory top option in dropdowns.
 empty_label = '{$i18n.dropdown.all|escape:'javascript'}';
 
 // inArray - determines whether needle is in haystack array.
@@ -39,6 +62,56 @@ function inArray(needle, haystack) {
   }
   return false;
 }
+
+// The fillProjectDropdown function populates the project combo box with
+// projects associated with a selected client (client id is passed here as id).
+function fillProjectDropdown(id) {
+  var str_ids = project_ids[id];
+  var dropdown = document.getElementById("project");
+
+  // Determine previously selected item.
+  var selected_item = dropdown.options[dropdown.selectedIndex].value;
+
+  // Remove existing content.
+  dropdown.length = 0;
+  var project_reset = true;
+  // Add mandatory top option.
+  dropdown.options[0] = new Option(empty_label, '', true);
+
+  // Populate project dropdown.
+  if (!id) {
+    // If we are here, client is not selected.
+    var len = projects.length;
+    for (var i = 0; i < len; i++) {
+      dropdown.options[i+1] = new Option(projects[i][1], projects[i][0]);
+      if (dropdown.options[i+1].value == selected_item)  {
+        dropdown.options[i+1].selected = true;
+        project_reset = false;
+      }
+    }
+  } else if (str_ids) {
+    var ids = new Array();
+    ids = str_ids.split(",");
+    var len = ids.length;
+
+    for (var i = 0; i < len; i++) {
+      var p_id = ids[i];
+      dropdown.options[i+1] = new Option(project_names[p_id], p_id);
+      if (dropdown.options[i+1].value == selected_item)  {
+        dropdown.options[i+1].selected = true;
+        project_reset = false;
+      }
+    }
+  }
+
+  // If project selection was reset - clear the tasks dropdown.
+  if (project_reset) {
+    dropdown = document.getElementById("task");
+    dropdown.length = 0;
+    dropdown.options[0] = new Option(empty_label, '', true);
+  }
+}
+
 
 // The fillTaskDropdown function populates the task combo box with
 // tasks associated with a selected project_id.
@@ -133,17 +206,30 @@ function selectAssignedUsers(project_id) {
   }
 }
 
-// handleCheckboxes - unmarks and disables the "Totals only" checkbox when
-// "no grouping" is selected in the associated dropdown.
-// In future we need to improve this function and hide not relevant elements completely.
+// handleCheckboxes - unmarks and hides the "Totals only" checkbox when
+// "no grouping" is selected in the associated group by dropdowns.
 function handleCheckboxes() {
   var totalsOnlyCheckbox = document.getElementById("chtotalsonly");
-  if ("no_grouping" == document.getElementById("group_by").value) {
-    // Unmark and disable the "Totals only" checkbox.
+  var totalsOnlyLabel = document.getElementById("totals_only_label");
+  var groupBy1 = document.getElementById("group_by1");
+  var groupBy2 = document.getElementById("group_by2");
+  var groupBy3 = document.getElementById("group_by3");
+  var grouping = false;
+  if ((groupBy1 != null && "no_grouping" != groupBy1.value) ||
+      (groupBy2 != null && "no_grouping" != groupBy2.value) ||
+      (groupBy3 != null && "no_grouping" != groupBy3.value)) {
+    grouping = true;
+  }
+  if (grouping) {
+    // Show the "Totals only" checkbox.
+    totalsOnlyCheckbox.style.visibility = "visible";
+    totalsOnlyLabel.style.visibility = "visible";
+  } else {
+    // Unmark and hide the "Totals only" checkbox.
     totalsOnlyCheckbox.checked = false;
-    totalsOnlyCheckbox.disabled = true;
-  } else
-    totalsOnlyCheckbox.disabled = false;
+    totalsOnlyCheckbox.style.visibility = "hidden";
+    totalsOnlyLabel.style.visibility = "hidden";
+  }
 }
 </script>
 
@@ -167,54 +253,67 @@ function handleCheckboxes() {
   <tr>
     <td valign="top" colspan="2" align="center">
       <table border="0" cellpadding="3">
-{if (($user->isPluginEnabled('cl') && !($user->isClient() && $user->client_id)) || ($custom_fields && $custom_fields->fields[0] && $custom_fields->fields[0]['type'] == CustomFields::TYPE_DROPDOWN))}
         <tr>
-  {if $user->isPluginEnabled('cl') && !($user->isClient() && $user->client_id)}<td><b>{$i18n.label.client}</b></td>{else}<td>&nbsp;</td>{/if}
-          <td>&nbsp;</td>
-  {if ($custom_fields && $custom_fields->fields[0] && $custom_fields->fields[0]['type'] == CustomFields::TYPE_DROPDOWN)}<td><b>{$i18n.label.option}</b></td>{else}<td>&nbsp;</td>{/if}
+          <td valign="top">
+            <table border="0" cellpadding="3">
+{if $show_client}
+              <tr><td><b>{$i18n.label.client}</b></td></tr>
+              <tr><td>{$forms.reportForm.client.control}</td></tr>
+{/if}
+{if $show_project}
+              <tr><td><b>{$i18n.label.project}</b></td></tr>
+              <tr><td>{$forms.reportForm.project.control}</td></tr>
+{/if}
+{if $show_billable}
+              <tr><td><b>{$i18n.form.time.billable}</b></td></tr>
+              <tr><td>{$forms.reportForm.include_records.control}</td></tr>
+{/if}
+{if $show_paid_status}
+              <tr><td><b>{$i18n.label.paid_status}</b></td></tr>
+              <tr><td>{$forms.reportForm.paid_status.control}</td></tr>
+{/if}
+            </table>
+          </td>
+          <td></td>
+          <td valign="top">
+            <table border="0" cellpadding="3">
+{if $show_cf_1_dropdown}
+              <tr><td><b>{$i18n.label.option}</b></td></tr>
+              <tr><td>{$forms.reportForm.option.control}</td></tr>
+{/if}
+{if $show_task}
+              <tr><td><b>{$i18n.label.task}</b></td></tr>
+              <tr><td>{$forms.reportForm.task.control}</td></tr>
+{/if}
+{if $show_approved}
+              <tr><td><b>{$i18n.label.approved}</b></td></tr>
+              <tr><td>{$forms.reportForm.approved.control}</td></tr>
+{/if}
+{if $show_invoice_dropdown}
+              <tr><td><b>{$i18n.label.invoice}</b></td></tr>
+              <tr><td>{$forms.reportForm.invoice.control}</td></tr>
+{/if}
+{if $show_timesheet_dropdown}
+              <tr><td><b>{$i18n.label.timesheet}</b></td></tr>
+              <tr><td>{$forms.reportForm.timesheet.control}</td></tr>
+{/if}
+            </table>
+          </td>
+        </tr>
+{if $show_active_users}
+        <tr>
+          <td colspan="3"><b>{if $show_inactive_users}{$i18n.label.active_users}{else}{$i18n.label.users}{/if}</b></td>
         </tr>
         <tr>
-          <td>{$forms.reportForm.client.control}</td>
-          <td>&nbsp;</td>
-          <td>{$forms.reportForm.option.control}</td>
+          <td colspan="3">{$forms.reportForm.users_active.control}</td>
         </tr>
 {/if}
-{if ($smarty.const.MODE_PROJECTS == $user->tracking_mode || $smarty.const.MODE_PROJECTS_AND_TASKS == $user->tracking_mode)}
+{if $show_inactive_users}
         <tr>
-          <td><b>{$i18n.label.project}</b></td>
-          <td>&nbsp;</td>
-  {if ($smarty.const.MODE_PROJECTS_AND_TASKS == $user->tracking_mode)}
-          <td><b>{$i18n.label.task}</b></td>
-  {/if}
-        </tr>
-{/if}
-{if ($smarty.const.MODE_PROJECTS == $user->tracking_mode || $smarty.const.MODE_PROJECTS_AND_TASKS == $user->tracking_mode)}
-        <tr>
-          <td>{$forms.reportForm.project.control}</td>
-          <td>&nbsp;</td>
-  {if ($smarty.const.MODE_PROJECTS_AND_TASKS == $user->tracking_mode)}
-          <td>{$forms.reportForm.task.control}</td>
-  {/if}
-        </tr>
-{/if}
-{if $user->isPluginEnabled('iv')}
-        <tr>
-          <td><b>{$i18n.form.time.billable}</b></td>
-          <td>&nbsp;</td>
-          <td><b>{$i18n.label.invoice}</b></td>
-        </tr>
-        <tr valign="top">
-          <td>{$forms.reportForm.include_records.control}</td>
-          <td>&nbsp;</td>
-          <td>{$forms.reportForm.invoice.control}</td>
-        </tr>
-{/if}
-{if $user->canManageTeam() || $user->isClient()}
-        <tr>
-          <td colspan="3"><b>{$i18n.label.users}</b></td>
+          <td colspan="3"><b>{$i18n.label.inactive_users}</b></td>
         </tr>
         <tr>
-          <td colspan="3">{$forms.reportForm.users.control}</td>
+          <td colspan="3">{$forms.reportForm.users_inactive.control}</td>
         </tr>
 {/if}
         <tr>
@@ -236,44 +335,78 @@ function handleCheckboxes() {
         <tr>
           <td colspan="3">
             <table border="0" width="100%">
-{if $user->isPluginEnabled('cl') || $user->isPluginEnabled('iv')}
               <tr>
-  {if $user->isPluginEnabled('cl')}
-                <td width="25%"><label>{$forms.reportForm.chclient.control}&nbsp;{$i18n.label.client}</label></td>
-  {/if}
-  {if ($user->canManageTeam() || $user->isClient()) && $user->isPluginEnabled('iv')}
-                <td width="25%"><label>{$forms.reportForm.chinvoice.control}&nbsp;{$i18n.label.invoice}</label></td>
-  {/if}
-              </tr>
+                <td width="25%" valign="top">
+                  <table border="0" cellpadding="3">
+{if $show_client}
+                    <tr><td><label>{$forms.reportForm.chclient.control}&nbsp;{$i18n.label.client}</label></td></tr>
 {/if}
-              <tr>
-                <td width="25%">{if ($smarty.const.MODE_PROJECTS == $user->tracking_mode || $smarty.const.MODE_PROJECTS_AND_TASKS == $user->tracking_mode)}<label>{$forms.reportForm.chproject.control}&nbsp;{$i18n.label.project}</label>{/if}</td>
-                <td width="25%">{if (($smarty.const.TYPE_START_FINISH == $user->record_type) || ($smarty.const.TYPE_ALL == $user->record_type))}<label>{$forms.reportForm.chstart.control}&nbsp;{$i18n.label.start}</label>{/if}</td>
-                <td width="25%"><label>{$forms.reportForm.chduration.control}&nbsp;{$i18n.label.duration}</label></td>
-{if ((($user->canManageTeam() || $user->isClient()) || $user->isPluginEnabled('ex')) && defined('COST_ON_REPORTS') && isTrue($smarty.const.COST_ON_REPORTS))}
-                  <td width="25%"><label>{$forms.reportForm.chcost.control}&nbsp;{$i18n.label.cost}</label></td>
-{else}
-                  <td></td>
+{if $show_project}
+                    <tr><td><label>{$forms.reportForm.chproject.control}&nbsp;{$i18n.label.project}</label></td></tr>
 {/if}
-              </tr>
-              <tr>
-                <td>{if ($smarty.const.MODE_PROJECTS_AND_TASKS == $user->tracking_mode)}<label>{$forms.reportForm.chtask.control}&nbsp;{$i18n.label.task}</label>{/if}</td>
-                <td>{if (($smarty.const.TYPE_START_FINISH == $user->record_type) || ($smarty.const.TYPE_ALL == $user->record_type))}<label>{$forms.reportForm.chfinish.control}&nbsp;{$i18n.label.finish}</label>{/if}</td>
-                <td><label>{$forms.reportForm.chnote.control}&nbsp;{$i18n.label.note}</label></td>
-{if ($custom_fields && $custom_fields->fields[0])}
-                <td><label>{$forms.reportForm.chcf_1.control}&nbsp;{$custom_fields->fields[0]['label']|escape}</label></td>
-{else}
-                <td></td>
+{if $show_timesheet_checkbox}
+                    <tr><td><label>{$forms.reportForm.chtimesheet.control}&nbsp;{$i18n.label.timesheet}</label></td></tr>
 {/if}
+{if $show_cf_1_checkbox}
+                    <tr><td><label>{$forms.reportForm.chcf_1.control}&nbsp;{$custom_fields->fields[0]['label']|escape}</label></td></tr>
+{/if}
+                  </table>
+                </td>
+                <td width="25%" valign="top">
+                  <table border="0" cellpadding="3">
+{if $show_start}
+                    <tr><td><label>{$forms.reportForm.chstart.control}&nbsp;{$i18n.label.start}</label></td></tr>
+{/if}
+{if $show_task}
+                    <tr><td><label>{$forms.reportForm.chtask.control}&nbsp;{$i18n.label.task}</label></td></tr>
+{/if}
+{if $show_ip}
+                    <tr><td><label>{$forms.reportForm.chip.control}&nbsp;{$i18n.label.ip}</label></td></tr>
+{/if}
+{if $show_work_units}
+                    <tr><td><label>{$forms.reportForm.chunits.control}&nbsp;{$i18n.label.work_units}</label></td></tr>
+{/if}
+                  </table>
+                </td>
+                <td width="25%" valign="top">
+                  <table border="0" cellpadding="3">
+{if $show_finish}
+                    <tr><td><label>{$forms.reportForm.chfinish.control}&nbsp;{$i18n.label.finish}</label></td></tr>
+{/if}
+                    <tr><td><label>{$forms.reportForm.chnote.control}&nbsp;{$i18n.label.note}</label></td></tr>
+{if $show_approved}
+                    <tr><td><label>{$forms.reportForm.chapproved.control}&nbsp;{$i18n.label.approved}</label></td></tr>
+{/if}
+{if $show_invoice_checkbox}
+                    <tr><td><label>{$forms.reportForm.chinvoice.control}&nbsp;{$i18n.label.invoice}</label></td></tr>
+{/if}
+                  </table>
+                </td>
+                <td width="25%" valign="top">
+                  <table border="0" cellpadding="3">
+                    <tr><td><label>{$forms.reportForm.chduration.control}&nbsp;{$i18n.label.duration}</label></td></tr>
+                    <tr><td><label>{$forms.reportForm.chcost.control}&nbsp;{$i18n.label.cost}</label></td></tr>
+{if $show_paid_status}
+                    <tr><td><label>{$forms.reportForm.chpaid.control}&nbsp;{$i18n.label.paid}</label></td></tr>
+{/if}
+{if $show_files}
+                    <tr><td><label>{$forms.reportForm.chfiles.control}&nbsp;{$i18n.label.files}</label></td></tr>
+{/if}
+                  </table>
+                </td>
               </tr>
             </table>
           </td>
         </tr>
-        <tr>
-          <td><b>{$i18n.form.reports.group_by}</b></td>
-        </tr>
+
+        <tr><td><b>{$i18n.form.reports.group_by}</b></td></tr>
         <tr valign="top">
-          <td>{$forms.reportForm.group_by.control} <label>{$forms.reportForm.chtotalsonly.control} {$i18n.form.reports.totals_only}</label></td>
+          <td>{$forms.reportForm.group_by1.control}</td>
+          <td>{$forms.reportForm.group_by2.control}</td>
+          <td>{$forms.reportForm.group_by3.control}</td>
+        </tr>
+        <tr>
+            <td><span id="totals_only_label"><label>{$forms.reportForm.chtotalsonly.control} {$i18n.label.totals_only}</label></span></td>
         </tr>
       </table>
 

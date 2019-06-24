@@ -26,22 +26,20 @@
 // | https://www.anuko.com/time_tracker/credits.htm
 // +----------------------------------------------------------------------+
 
-import('ttTeamHelper');
-import('ttUserHelper');
-
 // Class ttNotificationHelper is used to help with notification related tasks.
 class ttNotificationHelper {
 	
   // get - gets notification details. 
-  static function get($id)
-  {
+  static function get($id) {
     global $user;
- 
     $mdb2 = getConnection();
 
-    $sql = "select c.id, c.cron_spec, c.report_id, c.email, c.status, fr.name from tt_cron c
-      left join tt_fav_reports fr on (fr.id = c.report_id)
-      where c.id = $id and c.team_id = $user->team_id";
+    $group_id = $user->getGroup();
+    $org_id = $user->org_id;
+
+    $sql = "select c.id, c.cron_spec, c.report_id, c.email, c.cc, c.subject, c.report_condition, c.status, fr.name from tt_cron c".
+      " left join tt_fav_reports fr on (fr.id = c.report_id)".
+      " where c.id = $id and c.group_id = $group_id and c.org_id = $org_id";
     $res = $mdb2->query($sql);
     if (!is_a($res, 'PEAR_Error')) {
       $val = $res->fetchRow();
@@ -54,31 +52,38 @@ class ttNotificationHelper {
   // delete - deletes a notification from tt_cron table. 
   static function delete($id) {
     global $user;
-  	    
     $mdb2 = getConnection();
-    
-    $sql = "delete from tt_cron where id = $id and team_id = $user->team_id";
+
+    $group_id = $user->getGroup();
+    $org_id = $user->org_id;
+
+    $sql = "delete from tt_cron where id = $id and group_id = $group_id and org_id = $org_id";
     $affected = $mdb2->exec($sql);
     if (is_a($affected, 'PEAR_Error'))
       return false;
 
-  	return true;
+    return true;
   }
   
   // insert function inserts a new notification into database.
-  static function insert($fields)
-  {
+  static function insert($fields) {
+    global $user;
     $mdb2 = getConnection();
 
-    $team_id = (int) $fields['team_id'];
+    $group_id = $user->getGroup();
+    $org_id = $user->org_id;
+
     $cron_spec = $fields['cron_spec'];
     $next = (int) $fields['next'];
     $report_id = (int) $fields['report_id'];
     $email = $fields['email'];
+    $cc = $fields['cc'];
+    $subject = $fields['subject'];
+    $report_condition = $fields['report_condition'];
     $status = $fields['status'];
     
-    $sql = "insert into tt_cron (team_id, cron_spec, next, report_id, email, status)
-      values ($team_id, ".$mdb2->quote($cron_spec).", $next, $report_id, ".$mdb2->quote($email).", ".$mdb2->quote($status).")";
+    $sql = "insert into tt_cron (group_id, org_id, cron_spec, next, report_id, email, cc, subject, report_condition, status)".
+      " values ($group_id, $org_id, ".$mdb2->quote($cron_spec).", $next, $report_id, ".$mdb2->quote($email).", ".$mdb2->quote($cc).", ".$mdb2->quote($subject).", ".$mdb2->quote($report_condition).", ".$mdb2->quote($status).")";
     $affected = $mdb2->exec($sql);
     if (is_a($affected, 'PEAR_Error'))
       return false;
@@ -87,20 +92,28 @@ class ttNotificationHelper {
   } 
   
   // update function - updates a notification in database.
-  static function update($fields)
-  {
+  static function update($fields) {
+    global $user;
     $mdb2 = getConnection();
-    
+
+    $group_id = $user->getGroup();
+    $org_id = $user->org_id;
+
     $notification_id = (int) $fields['id'];
-    $team_id = (int) $fields['team_id'];
     $cron_spec = $fields['cron_spec'];
     $next = (int) $fields['next'];
     $report_id = (int) $fields['report_id'];
     $email = $fields['email'];
+    $cc = $fields['cc'];
+    $subject = $fields['subject'];
+    $report_condition = $fields['report_condition'];
     $status = $fields['status'];
     
-    $sql = "update tt_cron set cron_spec = ".$mdb2->quote($cron_spec).", next = $next, report_id = $report_id, email = ".$mdb2->quote($email).", status = ".$mdb2->quote($status).
-      " where id = $notification_id and team_id = $team_id";
+    $sql = "update tt_cron".
+      " set cron_spec = ".$mdb2->quote($cron_spec).", next = $next, report_id = $report_id".
+      ",  email = ".$mdb2->quote($email).", cc = ".$mdb2->quote($cc).", subject = ".$mdb2->quote($subject).
+      ", report_condition = ".$mdb2->quote($report_condition).", status = ".$mdb2->quote($status).
+      " where id = $notification_id and group_id = $group_id and org_id = $org_id";
     $affected = $mdb2->exec($sql);
     return (!is_a($affected, 'PEAR_Error'));
   }

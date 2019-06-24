@@ -20,12 +20,13 @@
     {if $time_records}
       <table class="mobile-table-details">
       {foreach $time_records as $record}
-      <tr bgcolor="{cycle values="#ccccce,#f5f5f5"}" {if !$record.billable} class="not_billable" {/if}>
+      <tr bgcolor="{cycle values="#f5f5f5,#ffffff"}" {if !$record.billable} class="not_billable" {/if}>
 {if ($smarty.const.MODE_PROJECTS == $user->tracking_mode || $smarty.const.MODE_PROJECTS_AND_TASKS == $user->tracking_mode)}
         <td valign="top">{$record.project|escape}</td>
 {/if}
         <td align="right" valign="top">{if ($record.duration == '0:00' && $record.start <> '')}<font color="#ff0000">{/if}{$record.duration}{if ($record.duration == '0:00' && $record.start <> '')}</font>{/if}</td>
-        <td align="center">{if $record.invoice_id}&nbsp;{else}<a href="time_edit.php?id={$record.id}">{$i18n.label.edit}</a>{/if}</td>
+        <td align="center">{if $record.approved || $record.timesheet_id || $record.invoice_id}&nbsp;{else}<a href="time_edit.php?id={$record.id}"><img class="table_icon" alt="{$i18n.label.edit}" src="../images/icon_edit.png"></a>{/if}</td>
+        <td align="center">{if $record.approved || $record.timesheet_id || $record.invoice_id}&nbsp;{else}<a href="time_delete.php?id={$record.id}"><img class="table_icon" alt="{$i18n.label.delete}" src="../images/icon_delete.png"></a>{/if}</td>
       </tr>
       {/foreach}
     </table>
@@ -48,12 +49,16 @@
   <tr>
     <td valign="top">
     <table border="0">
+{if $user_dropdown}
+      <tr><td>{$i18n.label.user}:</td></tr>
+      <tr><td>{$forms.timeRecordForm.user.control}</td></tr>
+{/if}
 {if $user->isPluginEnabled('cl')}
-    <tr><td>{$i18n.label.client}:</td></tr>
-    <tr><td>{$forms.timeRecordForm.client.control}</td></tr>
+      <tr><td>{$i18n.label.client}:</td></tr>
+      <tr><td>{$forms.timeRecordForm.client.control}</td></tr>
 {/if}
 {if $user->isPluginEnabled('iv')}
-    <tr><td><label>{$forms.timeRecordForm.billable.control}{$i18n.form.time.billable}</label></td></tr>
+      <tr><td><label>{$forms.timeRecordForm.billable.control}{$i18n.form.time.billable}</label></td></tr>
 {/if}
 {if ($custom_fields && $custom_fields->fields[0])}
       <tr><td>{$custom_fields->fields[0]['label']|escape}:</td></tr>
@@ -77,6 +82,10 @@
 {if (($smarty.const.TYPE_DURATION == $user->record_type) || ($smarty.const.TYPE_ALL == $user->record_type))}
     <tr><td>{$i18n.label.duration}:</td></tr>
     <tr><td>{$forms.timeRecordForm.duration.control}</td></tr>
+{/if}
+{if $template_dropdown}
+    <tr><td>{$i18n.label.template}:</td></tr>
+    <tr><td>{$forms.timeRecordForm.template.control}</td></tr>
 {/if}
 
     <tr><td>{$i18n.label.note}:</td></tr>

@@ -33,13 +33,16 @@ class FloatField extends TextField {
   var $mFFormat;
   
   function __construct($name) {
+    global $user;
+
     $this->class = 'FloatField';
     $this->name = $name;
+    $this->mDelimiter = $user->getDecimalMark();
   }
 
-  function localize($i18n) {
+  function localize() {
     global $user;
-    $this->mDelimiter = $user->decimal_mark;
+    $this->mDelimiter = $user->getDecimalMark();
   }
 
   function setFormat($format) {
